@@ -41,7 +41,7 @@ Built and maintained by Kyle (fobiat).
 
 ## What you get
 
-Sixteen reference files and a router, roughly 15,000 lines, every factual claim traceable
+Sixteen reference files and a router, just over 13,000 lines, every factual claim traceable
 to engine source at a named version.
 
 It covers the whole surface a game touches, not only the gameplay loop:
