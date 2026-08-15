@@ -10,17 +10,17 @@
             which is MIT licensed. See LICENSE at the repository root.
 -->
 
-# UI & Razor Panels
+# Panels, Razor, and the UI Layer
 
-How Panels are built and styled: Razor markup, SCSS, lifecycle, data binding, event wiring, the stock control library, and page navigation. Pulled straight from the engine source at version **26.08.05** (`sbox-public`), not from memory or the web docs.
+Covers how a Panel gets built and styled: Razor syntax, SCSS, the component lifecycle, data binding, event handling, the built-in control set, and moving between pages. Everything below was read directly out of the `sbox-public` engine source at version **26.08.05**, not recalled from memory or lifted from the web docs.
 
----
+***
 
-## Architecture
+## How Panels Fit Together
 
 Everything on screen sits in a **Panel** tree, laid out with CSS flexbox underneath. You have two ways to build that tree: write it by hand in C#, or describe it in Razor, which mixes HTML/CSS with C#. Neither is more "real" than the other; Razor compiles down to the same Panel objects, so a hand-built C# panel and a Razor one behave identically at runtime.
 
-**Hierarchy:** `ScreenPanel` or `WorldPanel` component (on a GameObject) → `PanelComponent` (root) → child `Panel`s
+**Tree shape:** a `ScreenPanel` or `WorldPanel` component sits on a GameObject, that component owns a root `PanelComponent`, and every further `Panel` hangs off it as a child.
 
 - `PanelComponent` is a `Component` subclass and lives on a GameObject like any other component. It is not itself a Panel.
 - `Panel`, by contrast, is what every actual UI element derives from.
@@ -28,11 +28,11 @@ Everything on screen sits in a **Panel** tree, laid out with CSS flexbox underne
 
 **Where people get tripped up:** `<MyPanelComponent />` inside another panel's markup does not work. A `PanelComponent` needs a GameObject with a ScreenPanel or WorldPanel underneath it; it cannot be embedded as a child element. Nesting inside Razor markup is reserved for plain `Panel` subclasses.
 
----
+***
 
-## Razor Panels
+## Writing Panels in Razor
 
-### File Structure
+### File Layout
 
 ```
 MyHud.razor          # PanelComponent (root): add to GameObject with ScreenPanel
@@ -41,7 +41,7 @@ HealthBar.razor      # Child Panel: used inside MyHud
 HealthBar.razor.scss
 ```
 
-### PanelComponent (Root)
+### The Root PanelComponent
 
 ```razor
 @using Sandbox;
@@ -64,7 +64,7 @@ HealthBar.razor.scss
 }
 ```
 
-### Child Panel
+### A Child Panel
 
 ```razor
 @using Sandbox;
@@ -83,7 +83,7 @@ HealthBar.razor.scss
 }
 ```
 
-### Key Rules
+### Gotchas
 
 The handful of behaviors that aren't obvious until they bite you:
 
@@ -92,7 +92,7 @@ The handful of behaviors that aren't obvious until they bite you:
 - `@` is the escape hatch into C# from inside HTML, whether that's a bare variable (`@MyVar`), a parenthesized expression (`@(expression)`), or a control-flow block (`@foreach`, `@if`).
 - Hit a `return;` partway through the Razor body and everything after it simply doesn't render.
 
-### BuildHash
+### `BuildHash`
 
 The template body is not re-run every frame. Instead, `BuildHash()` produces a value each frame, that value is diffed against last frame's, and the body only re-executes on a change. The consequence: any field the template reads must feed into the hash, or the panel silently freezes on that field's old value while everything else keeps updating.
 
@@ -102,13 +102,13 @@ protected override int BuildHash() => System.HashCode.Combine( Health, Armor, Is
 
 There are two rebuild triggers outside of `BuildHash()` changing: hover and click, because those toggle pseudo-classes the stylesheet might key off of. Anything else that should force a rebuild needs an explicit `StateHasChanged()` call.
 
-### Passing Properties
+### Passing Properties Down
 
 ```razor
 <HealthBar Health=@(30) Name=@("Player 1") />
 ```
 
-### Panel References
+### Getting a Reference with `@ref`
 
 ```razor
 <HealthBar @ref="MyHealthBar" />
@@ -117,7 +117,7 @@ There are two rebuild triggers outside of `BuildHash()` changing: hover and clic
 }
 ```
 
-### Two-Way Binding
+### Binding Both Ways with `:bind`
 
 `:bind` links a property to a control's value in both directions at once, which removes the need to write a change handler yourself:
 
@@ -130,7 +130,7 @@ There are two rebuild triggers outside of `BuildHash()` changing: hover and clic
 }
 ```
 
-### RenderFragment (Reusable Components)
+### `RenderFragment`: Reusable Components
 
 Think of a `RenderFragment` property as a named hole in the component: the parent fills it with markup, and the component itself decides where that markup gets placed.
 
@@ -146,7 +146,7 @@ Think of a `RenderFragment` property as a named hole in the component: the paren
 }
 ```
 
-Usage:
+Used like this:
 ```razor
 <InfoCard>
     <Header>Player Stats</Header>
@@ -165,7 +165,7 @@ You get a `ChildContent` fragment on every panel automatically, without declarin
 </InfoCard>
 ```
 
-### RenderFragment\<T\> (Templated Components)
+### `RenderFragment<T>`: Templated Components
 
 Add a type parameter and the fragment can hand a value down into whatever markup it renders, which is exactly the mechanism behind list rows and per-item templates.
 
@@ -183,7 +183,7 @@ Add a type parameter and the fragment can hand a value down into whatever markup
 }
 ```
 
-Usage with `Context`:
+Used with a `Context` name:
 ```razor
 <PlayerList Players=@AllPlayers>
     <PlayerRow Context="item">
@@ -195,7 +195,7 @@ Usage with `Context`:
 </PlayerList>
 ```
 
-### Generic Panels
+### Panels with a Type Parameter
 
 ```razor
 @typeparam T
@@ -208,25 +208,25 @@ Usage with `Context`:
 }
 ```
 
-Usage in Razor: `<MyPanel T="string" Value=@("hello") />`
+In Razor markup: `<MyPanel T="string" Value=@("hello") />`
 
----
+***
 
-## Panel vs PanelComponent Differences
+## Panel vs PanelComponent, Side by Side
 
-| | Panel | PanelComponent |
-|---|---|---|
-| Base class | `Sandbox.UI.Panel` | `Sandbox.Component` |
-| Lifecycle | `Tick()`, `OnAfterTreeRender(bool firstTime)` | `OnStart()`, `OnUpdate()`, etc. |
-| Style access | `Style.Left = ...` | `Panel.Style.Left = ...` |
-| Nesting | Can be used in Razor `<MyPanel />` | Must be on a GameObject, cannot be nested |
-| Scene access | Via `Scene` (if has one) | Full component access |
+| Aspect | Panel | PanelComponent |
+| :-- | :-- | :-- |
+| Parent class | `Sandbox.UI.Panel` | `Sandbox.Component` |
+| Per-frame hooks | `Tick()`, `OnAfterTreeRender(bool firstTime)` | `OnStart()`, `OnUpdate()`, and the rest of the component lifecycle |
+| Touching style | `Style.Left = ...` | `Panel.Style.Left = ...` |
+| Can it nest | Drop it straight into Razor as `<MyPanel />` | No, it has to sit on its own GameObject |
+| Reaching the scene | Through `Scene`, when one exists | Full component access, since it is a component |
 
----
+***
 
 ## Styling
 
-### SCSS Stylesheets
+### Stylesheet Loading
 
 Naming does the wiring for you: a panel called `MyPanel.razor` picks up `MyPanel.razor.scss` with zero configuration.
 
@@ -241,14 +241,14 @@ Pulling in other stylesheets follows ordinary SCSS syntax:
 @import "shared/buttons.scss";
 ```
 
-### Inline Styles
+### Setting Styles Inline
 
 ```razor
 <label style="color: red; font-size: 24px;">DANGER</label>
 <div style="width: @(Progress * 100f)%"></div>
 ```
 
-### Style Blocks
+### `<style>` Blocks in Markup
 
 ```razor
 <style>
@@ -260,7 +260,7 @@ Pulling in other stylesheets follows ordinary SCSS syntax:
 </root>
 ```
 
-### Runtime Style Modification
+### Changing Style at Runtime
 
 ```csharp
 // In C# code (Panel.Tick or Component.OnUpdate)
@@ -270,7 +270,7 @@ myPanel.Style.Opacity = 0.5f;
 myPanel.Style.Dirty();  // marks the style dirty, which schedules a re-layout
 ```
 
-### CSS Classes (C# API)
+### Working with CSS Classes from C#
 
 ```csharp
 panel.AddClass( "active" );
@@ -282,34 +282,34 @@ panel.BindClass( "alive", () => HP > 0 ); // auto-toggle from func
 panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 ```
 
----
+***
 
 ## Layout System
 
 **Flexbox is not one option among several here, it's the whole model.** `display: flex` is both the default and the only alternative to `none`, full stop. Grid, inline flow, block flow: none of that exists, so instincts built on those modes will lead you wrong.
 
-### Key Layout Properties
+### The Flex Properties That Matter
 
-| Property | Values | Default |
-|----------|--------|---------|
+| Property | Accepted Values | Default Value |
+| :-- | :-- | :-- |
 | `flex-direction` | `row`, `row-reverse`, `column`, `column-reverse` | `row` |
 | `justify-content` | `flex-start`, `center`, `flex-end`, `space-between`, `space-around`, `space-evenly` | `flex-start` |
 | `align-items` | `flex-start`, `center`, `flex-end`, `stretch`, `baseline` | `stretch` |
-| `align-self` | same as align-items + `auto` | `auto` |
+| `align-self` | same set as align-items, plus `auto` | `auto` |
 | `flex-wrap` | `nowrap`, `wrap`, `wrap-reverse` | `nowrap` |
-| `flex-grow` | float | `0` |
-| `flex-shrink` | float | `1` |
-| `flex-basis` | Length | `auto` |
-| `gap` | Length | none |
+| `flex-grow` | a float | `0` |
+| `flex-shrink` | a float | `1` |
+| `flex-basis` | a Length | `auto` |
+| `gap` | a Length | none set |
 | `position` | `static`, `relative`, `absolute` | `static` |
 | `overflow` | `visible`, `hidden`, `scroll` | `visible` |
 
-### Length Units
+### Expressing a Length
 
 Every dimension in the style system, no matter whether it's set from SCSS or from code, ultimately boils down to the C# type `Length`.
 
-| Unit | SCSS | C# |
-|------|------|----|
+| Unit | In SCSS | In C# |
+| :-- | :-- | :-- |
 | Pixels | `10px` | `Length.Pixels( 10 )` |
 | Percent | `50%` | `Length.Percent( 50 )` |
 | Viewport width | `10vw` | `Length.ViewWidth( 10 )` |
@@ -317,14 +317,14 @@ Every dimension in the style system, no matter whether it's set from SCSS or fro
 | Root em | `2rem` | `Length.Rem( 2 )` |
 | Em | `1.5em` | `Length.Em( 1.5f )` |
 | Auto | `auto` | `Length.Auto` |
-| Fraction | n/a | `Length.Fraction( 1 )` |
+| Fraction | not expressible in SCSS | `Length.Fraction( 1 )` |
 | Calc | `calc(100% - 20px)` | `Length.Calc( "100% - 20px" )` |
 
----
+***
 
 ## Transitions & Animations
 
-### CSS Transitions
+### Standard CSS Transitions
 
 Nothing unusual here; browser-standard CSS transitions behave the way you'd expect:
 
@@ -341,7 +341,7 @@ Nothing unusual here; browser-standard CSS transitions behave the way you'd expe
 }
 ```
 
-### Intro/Outro (s&box specific)
+### `:intro` and `:outro` (s&box-Only)
 
 These two pseudo-classes don't have a web CSS counterpart. `:intro` applies for exactly one frame at creation time, and whatever you declare under it becomes the FROM state of the transition, everything animates away from those values. `:outro` applies the instant `Panel.Delete()` runs, but deletion itself doesn't happen immediately: the panel holds off on actually being removed until its outro transitions finish playing, which is the whole mechanism that makes fade-outs and slide-outs on delete possible.
 
@@ -363,7 +363,7 @@ These two pseudo-classes don't have a web CSS counterpart. `:intro` applies for 
 }
 ```
 
-### CSS Animations
+### Keyframe Animations
 
 ```scss
 @keyframes spin {
@@ -379,7 +379,7 @@ These two pseudo-classes don't have a web CSS counterpart. `:intro` applies for 
 }
 ```
 
-### Sound on State Change
+### Playing Sound from a Style Change
 
 `sound-in` and `sound-out` trigger audio directly from a pseudo-class transition, no C# listener required:
 
@@ -394,13 +394,13 @@ These two pseudo-classes don't have a web CSS counterpart. `:intro` applies for 
 }
 ```
 
----
+***
 
-## Panel API
+## The Panel API Surface
 
 Every UI element ultimately derives from `Sandbox.UI.Panel`.
 
-### Tree / Hierarchy
+### Walking the Tree
 
 ```csharp
 panel.Parent                    // Panel
@@ -417,7 +417,7 @@ panel.Delete()                  // remove (respects :outro transitions)
 panel.IsDeleting                // bool, true while in outro phase
 ```
 
-### Identity & Classes
+### Names, IDs, and CSS Classes
 
 ```csharp
 panel.ElementName               // tag name (e.g., "label", "div")
@@ -426,7 +426,7 @@ panel.Class                     // List<string> of CSS classes
 panel.Classes                   // space-separated string
 ```
 
-### Visibility & Focus
+### Visibility, Focus, and Hover State
 
 ```csharp
 panel.IsVisible                 // visible (including parent visibility)
@@ -436,7 +436,7 @@ panel.HasFocus / HasHovered / HasActive  // pseudo-class states
 panel.SetMouseCapture( true )   // capture all mouse input
 ```
 
-### Scrolling
+### Scroll State
 
 ```csharp
 panel.ScrollOffset              // Vector2, current scroll position
@@ -447,7 +447,7 @@ panel.TryScrollToBottom()
 panel.PreferScrollToBottom      // auto-scroll to bottom (chat logs)
 ```
 
-### Events
+### Wiring Up Events
 
 There are three separate ways to wire up a listener: an attribute on the handler method, a direct call to add one, or an inline Razor attribute.
 
@@ -464,14 +464,14 @@ panel.CreateEvent( "mycustomevent" );
 <div onclick=@MyMethod>Click me</div>
 ```
 
-### Coordinate Conversion
+### Converting Between Screen and Panel Space
 
 ```csharp
 panel.ScreenPositionToPanelPosition( screenPos )   // → Vector2
 panel.PanelPositionToScreenPosition( panelPos )     // → Vector2
 ```
 
-### Builder Pattern
+### Building Panels from C# Directly
 
 Handy when a panel is being assembled entirely from C#, with no `.razor` file backing it:
 
@@ -482,7 +482,7 @@ row.Add.Image( "ui/icon.png", "icon" );
 row.Add.Icon( "favorite" );
 ```
 
-### Misc
+### A Few More Odds and Ends
 
 ```csharp
 panel.PlaySound( "ui.click" );
@@ -490,94 +490,94 @@ panel.Tooltip = "Hover text";
 panel.UserData = myObject;        // arbitrary data attachment
 ```
 
----
+***
 
 ## Built-in Controls
 
-### Label
+### `Label`
 
-Text display. Supports rich text and selection.
+Plain or rich text, selectable if you want it to be.
 
 ```razor
 <label>Simple text</label>
 <label class="title">@PlayerName</label>
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Text` | `string` | Display text |
-| `IsRich` | `bool` | Parse rich text markup |
-| `Selectable` | `bool` | Allow text selection |
-| `Multiline` | `bool` | Multi-line display |
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `Text` | `string` | The text shown |
+| `IsRich` | `bool` | Turns on rich-text markup parsing |
+| `Selectable` | `bool` | Lets the user select the text |
+| `Multiline` | `bool` | Wraps across multiple lines |
 
-### Button
+### `Button`
 
-Clickable button with text and optional icon.
+A clickable button, optionally carrying an icon.
 
 ```razor
 <Button Text="Click Me" Icon="play_arrow" onclick=@OnClick />
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Text` | `string` | Button label |
-| `Icon` | `string` | Material icon name |
-| `Disabled` | `bool` | Disable interaction |
-| `Active` | `bool` | Active/pressed state |
-| `Href` | `string` | Navigation URL (with NavigationHost) |
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `Text` | `string` | The label on the button |
+| `Icon` | `string` | Name of a Material icon to show |
+| `Disabled` | `bool` | Blocks interaction while true |
+| `Active` | `bool` | Marks it pressed/selected |
+| `Href` | `string` | A target URL, picked up by an enclosing NavigationHost |
 
-### TextEntry
+### `TextEntry`
 
-Text input field.
+A single or multi-line text input.
 
 ```razor
 <TextEntry Value:bind=@Name Placeholder="Enter name..." Icon="person" />
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Text` / `Value` | `string` | Current text |
-| `Placeholder` | `string` | Placeholder hint |
-| `Icon` | `string` | Prefix icon |
-| `Multiline` | `bool` | Multi-line input |
-| `Numeric` | `bool` | Numbers only |
-| `MinValue` / `MaxValue` | `float` | Numeric range |
-| `MinLength` / `MaxLength` | `int` | Character limits |
-| `HasClearButton` | `bool` | Show clear button |
-| `OnTextEdited` | `Action<string>` | Per-keystroke callback |
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `Text` / `Value` | `string` | What's currently typed |
+| `Placeholder` | `string` | Hint text shown when empty |
+| `Icon` | `string` | Icon shown before the text |
+| `Multiline` | `bool` | Accepts line breaks |
+| `Numeric` | `bool` | Restricts input to digits |
+| `MinValue` / `MaxValue` | `float` | Clamps the numeric range |
+| `MinLength` / `MaxLength` | `int` | Clamps character count |
+| `HasClearButton` | `bool` | Adds a clear-field button |
+| `OnTextEdited` | `Action<string>` | Fires on every keystroke |
 
-### Checkbox
+### `Checkbox`
 
 ```razor
 <Checkbox Value:bind=@IsEnabled LabelText="Enable feature" />
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Checked` / `Value` | `bool` | Checked state |
-| `LabelText` | `string` | Label text |
-| `ValueChanged` | `Action<bool>` | Change callback |
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `Checked` / `Value` | `bool` | Whether it's ticked |
+| `LabelText` | `string` | Text next to the box |
+| `ValueChanged` | `Action<bool>` | Fires when the state flips |
 
-### SliderControl
+### `SliderControl`
 
-Numeric slider.
+A draggable numeric slider.
 
 ```razor
 <SliderControl Min=@(0) Max=@(100) Step=@(1) Value:bind=@Volume />
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Value` | `float` | Current value |
-| `Min` / `Max` | `float` | Range |
-| `Step` | `float` | Increment step |
-| `ShowRange` | `bool` | Show min/max labels |
-| `ShowTextEntry` | `bool` | Show editable number |
-| `OnValueChanged` | `Action<float>` | Change callback |
+| Field | Type | Notes |
+| :-- | :-- | :-- |
+| `Value` | `float` | Where the handle sits |
+| `Min` / `Max` | `float` | Bounds of the slider |
+| `Step` | `float` | Increment per drag notch |
+| `ShowRange` | `bool` | Prints the min/max labels |
+| `ShowTextEntry` | `bool` | Adds an editable number box |
+| `OnValueChanged` | `Action<float>` | Fires when the value moves |
 
-### DropDown
+### `DropDown`
 
-Selection from options list.
+Pick one value from a list of options.
 
 ```razor
 <DropDown Value:bind=@SelectedWeapon>
@@ -598,17 +598,17 @@ dropdown.Options = new List<Option>
 };
 ```
 
-`Option` has: `string Title`, `string Icon`, `string Subtitle`, `string Tooltip`, `object Value`
+Each `Option` carries a `string Title`, `string Icon`, `string Subtitle`, `string Tooltip`, and an `object Value`.
 
-### SwitchControl
+### `SwitchControl`
 
-Toggle switch.
+An on/off toggle.
 
 ```razor
 <SwitchControl Value:bind=@IsEnabled />
 ```
 
-### Image
+### `Image`
 
 ```razor
 <img src="ui/crosshair.png" />
@@ -617,21 +617,21 @@ Toggle switch.
 
 ### Other Controls
 
-| Control | Description |
-|---------|-------------|
-| `IconPanel` | Material Design icon display |
-| `ButtonGroup` | Group of selectable buttons (tab-like) |
-| `SplitContainer` | Two panes with draggable divider |
-| `VirtualList` | Virtualized scrollable list (for large datasets) |
-| `VirtualGrid` | Virtualized scrollable grid |
-| `ScenePanel` | Renders a 3D SceneWorld in a panel |
-| `WebPanel` | Embedded web browser |
-| `MenuPanel` | Context/right-click menu |
-| `Form` | Form with field rows |
+| Control | What it Gives You |
+| :-- | :-- |
+| `IconPanel` | A single Material Design icon |
+| `ButtonGroup` | A row of buttons that behave like tabs |
+| `SplitContainer` | Two panes separated by a draggable divider |
+| `VirtualList` | A scrollable list built for large item counts |
+| `VirtualGrid` | The grid equivalent of `VirtualList` |
+| `ScenePanel` | Drops a 3D `SceneWorld` inside a panel |
+| `WebPanel` | An embedded browser |
+| `MenuPanel` | A context/right-click menu |
+| `Form` | Rows of labeled fields |
 
----
+***
 
-## VirtualGrid
+## `VirtualGrid`
 
 Naively rendering a few thousand items would mean a few thousand live Panel objects sitting in memory, the overwhelming majority off-screen at any given moment. `VirtualGrid` sidesteps that: it only instantiates panels for what's actually visible, recycling them as the list scrolls.
 
@@ -651,7 +651,7 @@ Naively rendering a few thousand items would mean a few thousand live Panel obje
 - CSS needs to give the grid an explicit size (`width: 100%; height: 100%`), because virtualized content gives it nothing to infer a size from.
 - Spacing between cells comes from the `gap` CSS property, same as anywhere else.
 
----
+***
 
 ## Navigation
 
@@ -680,32 +680,32 @@ protected override void OnStart()
 }
 ```
 
-| Method | Description |
-|--------|-------------|
-| `Navigate( string url )` | Go to URL |
-| `GoBack()` | Navigate back |
-| `GoForward()` | Navigate forward |
-| `CurrentUrl` | Current page URL |
-| `CurrentPanel` | Current page Panel |
+| Method | What it Does |
+| :-- | :-- |
+| `Navigate( string url )` | Jump to a URL |
+| `GoBack()` | Step back in history |
+| `GoForward()` | Step forward in history |
+| `CurrentUrl` | The URL currently showing |
+| `CurrentPanel` | The Panel currently showing |
 
 A page can implement `INavigatorPage` to get `OnNavigationOpen()` and `OnNavigationClose()` callbacks.
 
 `NavLinkPanel` compares its own `Href` to the active URL and adds `.active` when they match, so highlighting the current nav item takes no extra code on your end.
 
----
+***
 
-## Event Types
+## Kinds of Panel Events
 
-| Event | Properties | Triggered By |
-|-------|-----------|--------------|
-| `PanelEvent` | `Target`, `This`, `Name`, `Value`, `StopPropagation()` | Base for all events |
-| `MousePanelEvent` | `MouseButton` | Mouse interactions |
-| `ButtonEvent` | `Button`, `Pressed`, `HasShift/Ctrl/Alt` | Keyboard/mouse press |
-| `DragEvent` | (inherits PanelEvent) | Drag operations |
-| `PasteEvent` | `ClipboardValue` | Paste action |
-| `EscapeEvent` | n/a | Escape key |
+| Event | Carries | Fires On |
+| :-- | :-- | :-- |
+| `PanelEvent` | `Target`, `This`, `Name`, `Value`, `StopPropagation()` | the base every other event extends |
+| `MousePanelEvent` | `MouseButton` | mouse interaction |
+| `ButtonEvent` | `Button`, `Pressed`, `HasShift/Ctrl/Alt` | a keyboard or mouse press |
+| `DragEvent` | (inherits PanelEvent) | a drag |
+| `PasteEvent` | `ClipboardValue` | a paste |
+| `EscapeEvent` | n/a | the escape key |
 
-### Common Razor Events
+### Everyday Razor Event Bindings
 
 ```razor
 <div onclick=@OnClick>Click</div>
@@ -714,9 +714,9 @@ A page can implement `INavigatorPage` to get `OnNavigationOpen()` and `OnNavigat
 <div onmousedown=@OnPress>Press</div>
 ```
 
----
+***
 
-## Localization
+## Localizing Text
 
 Prefix a string with `#` anywhere, whether that's raw markup or a control property, and it gets resolved as a localization token automatically:
 
@@ -725,7 +725,7 @@ Prefix a string with `#` anywhere, whether that's raw markup or a control proper
 <Button Text="#menu.settings" />
 ```
 
-Token file: `Localization/en/mygame.json`
+The lookup table itself: `Localization/en/mygame.json`
 ```json
 {
     "menu.play": "Play Game",
@@ -735,28 +735,28 @@ Token file: `Localization/en/mygame.json`
 
 There's coverage for 31 languages out of the box. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-cn`, `zh-tw`, `ru`, `pt-br`, etc.
 
----
+***
 
-## Common Style Properties (Quick Reference)
+## Style Quick Reference
 
-### Differences from Web CSS
+### Where the Style Engine Departs from Browser CSS
 
 Coming in with browser CSS habits, watch for these spots where s&box's style engine parts ways with the standard:
 
-| Property | s&box Behavior |
-|----------|---------------|
-| `display` | Only `flex` (default) or `none`. Everything is flexbox. |
-| `position` | Only `static`, `relative`, `absolute`. No `fixed`. |
-| `font-family` | Specify by font name, not filename. Single font only. |
-| `pointer-events` | Default is `none`. Set to `all` for interactivity. |
-| `:intro` / `:outro` | s&box-specific. Transitions for create/delete. |
-| `sound-in` / `sound-out` | Play sounds on style apply/remove. |
-| `background-image-tint` | Custom. Multiplies background image by color. |
-| `content` | Sets `Label.Text` directly. |
+| Property | What s&box Does Differently |
+| :-- | :-- |
+| `display` | Two values exist, `flex` and `none`. There is no block, inline, or grid mode. |
+| `position` | Three values: `static`, `relative`, `absolute`. `fixed` was never implemented. |
+| `font-family` | Name the font itself, not a file. One font per declaration, no fallback stack. |
+| `pointer-events` | Starts at `none` for every panel. Flip it to `all` before you expect clicks. |
+| `:intro` / `:outro` | Not standard CSS. Governs the animation on creation and on delete. |
+| `sound-in` / `sound-out` | Fires a sound the moment the style rule is applied or lifted. |
+| `background-image-tint` | s&box-only. Multiplies the background image against a color. |
+| `content` | Writes straight into `Label.Text`. |
 
 The `pointer-events` default deserves its own callout: if a panel looks perfectly clickable but simply swallows nothing, the near-universal cause is that `pointer-events: all` is missing somewhere up its ancestor chain, since the engine defaults to `none`.
 
-### Common Patterns
+### Patterns You'll Reuse Constantly
 
 ```scss
 // Full-screen overlay
@@ -788,13 +788,13 @@ The `pointer-events` default deserves its own callout: if a panel looks perfectl
 }
 ```
 
----
+***
 
-## Complete Working Example
+## A Full Example, Start to Finish
 
 A health-bar-and-kill-feed HUD, put together to show a PanelComponent, its paired stylesheet, and `:intro`/`:outro` all working together in one place:
 
-**MyHud.razor:**
+**The panel, `MyHud.razor`:**
 ```razor
 @using Sandbox;
 @using Sandbox.UI;
@@ -820,7 +820,7 @@ A health-bar-and-kill-feed HUD, put together to show a PanelComponent, its paire
 }
 ```
 
-**MyHud.razor.scss:**
+**Its stylesheet, `MyHud.razor.scss`:**
 ```scss
 MyHud {
     position: absolute;

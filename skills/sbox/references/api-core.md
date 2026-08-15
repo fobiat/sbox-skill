@@ -566,16 +566,17 @@ not on the hot path.
 
 ## GameResource & `[AssetType]`
 
-A `GameResource` is a data asset defined in C# and authored as JSON on disk: the s&box
-answer to a Unity `ScriptableObject`. Item definitions, ammo types, vehicle stats,
-loot tables.
+`GameResource` is how s&box does what Unity calls a `ScriptableObject`: define the shape
+in C#, author instances as JSON on disk. Item definitions, ammo types, vehicle stats,
+and loot tables all fit this pattern.
 
 ### Declaring the type
 
-**`[GameResource( title, extension, description )]` is obsolete engine-wide**
-(`Resources/GameResourceAttribute.cs:82`, `[Obsolete( "Use AssetType instead" )]`). Under
-`TreatWarningsAsErrors` it is a hard build failure. Use `[AssetType]` with **property
-initializers**, not constructor arguments:
+**Don't reach for `[GameResource( title, extension, description )]`; it's obsolete engine-wide**
+(`Resources/GameResourceAttribute.cs:82`, `[Obsolete( "Use AssetType instead" )]`), and a
+project building with `TreatWarningsAsErrors` will refuse to compile it at all.
+`[AssetType]` is what replaces it, and it wants **property initializers**, not
+constructor arguments:
 
 ```csharp
 [AssetType( Name = "Item Definition", Extension = "item", Category = "MyGame" )]
@@ -591,23 +592,24 @@ public sealed class ItemDefinition : GameResource
 
 | Member | Type | Notes |
 |---|---|---|
-| `Name` | `string` | Title in the editor. Defaults to the class name if unset |
-| `Extension` | `string` | File extension, no period. Letters only, keep it under 8 chars |
-| `Category` | `string` | Grouping in the asset browser. Default `"Other"` |
+| `Name` | `string` | Editor-facing title; falls back to the class name if you leave it unset |
+| `Extension` | `string` | The file extension, no leading period, letters only, and short (under 8 characters) |
+| `Category` | `string` | Which group it sits under in the asset browser; `"Other"` by default |
 | `Flags` | `AssetTypeFlags` | `NoEmbedding`, `IncludeThumbnails` |
-| `IconColor` | `string` | Thumbnail accent, default `"#67ac5c"` |
-| `static FindTypeByExtension( string )` | `TypeDescription` | Reverse lookup |
+| `IconColor` | `string` | Accent color for the thumbnail, `"#67ac5c"` out of the box |
+| `static FindTypeByExtension( string )` | `TypeDescription` | Looks a type up by its extension, the reverse lookup |
 
-The base class is unchanged: you still derive from `GameResource`, and
-`PostLoad()` / `StateHasChanged()` still work. The engine's own
-`BaseAmmoResource` is the live reference implementation:
+None of this touches the base class: `GameResource` is still what you derive from, and
+`PostLoad()` and `StateHasChanged()` behave exactly as they did before. For a working
+example, look at the engine's own `BaseAmmoResource`:
 `[AssetType( Name = "Ammo Type", Extension = "ammo", Category = "Game" )]`
 (`Scene/Components/Game/Weapon/BaseAmmoResource.cs:8-10`).
 
 ### The on-disk JSON format
 
-Hand-authorable. **PascalCase keys matching the property names**, plus the envelope.
-Real engine asset (`game/addons/base/Assets/ammo/9mm.ammo`):
+You can write these by hand. **Keys are PascalCase, matching the property names**, with
+an envelope wrapped around them. Here's a real asset from the engine
+(`game/addons/base/Assets/ammo/9mm.ammo`):
 
 ```json
 {
@@ -619,14 +621,17 @@ Real engine asset (`game/addons/base/Assets/ammo/9mm.ammo`):
 }
 ```
 
-- `__references`: assets this one depends on. Leave `[]`; the editor maintains it.
-- `__version`: resource version, for your own migration logic.
-- A `Model` / `Material` / `SoundEvent` / other resource-typed `[Property]` serialises as
-  its **path string**: `"WorldModel": "models/citizen_props/crate01.vmdl"`.
+- `__references` lists the assets this one depends on; leave it `[]` and let the editor
+  keep it current.
+- `__version` is yours, use it for your own migration logic as the resource shape evolves.
+- Any `Model` / `Material` / `SoundEvent` / other resource-typed `[Property]` serialises
+  down to its **path string**, not its content: `"WorldModel":
+  "models/citizen_props/crate01.vmdl"`.
 
-The source file is inert until compiled. `CompileGameResource`
-(`Sandbox.Tools/Assets/AssetSystem.Compile.cs:87-123`) reads the JSON, scans it for
-references, and writes the compiled blob; the runtime only ever loads the `_c`
+Nothing happens with that source file until it's compiled. `CompileGameResource`
+(`Sandbox.Tools/Assets/AssetSystem.Compile.cs:87-123`) reads the JSON, resolves its
+references, and writes out a compiled blob, and it's that `_c` file the runtime actually
+loads at play time
 (`ResourceLibrary.LoadGameResource`, `:460`, appends `_c` at `:465` before reading, then
 `TryLoadFromData` → `Register` → `PostLoadInternal` at `:491`, `:511`, `:514`).
 
@@ -641,31 +646,34 @@ static Task<T> ResourceLibrary.LoadAsync<T>( string path )                     /
 static T       ResourceLibrary.Get<T>( int identifier )     // [Obsolete] :551
 ```
 
-(Line numbers in `Resources/ResourceLibrary.cs`.) `GetAll<T>()` is how you build a
-registry at startup; every compiled resource of that type is already registered.
+(Every line number above is in `Resources/ResourceLibrary.cs`.) A startup registry
+usually starts with `GetAll<T>()`, since every compiled resource of that type is already
+sitting in the index by then.
 
-`ResourceLibrary.IEventListener` gives you `OnRegister` / `OnUnregister` / `OnSave` /
-`OnExternalChanges` / `OnExternalChangesPostLoad` for editor-time hot-reload.
+Implement `ResourceLibrary.IEventListener` for editor-time hot-reload: it hands you
+`OnRegister` / `OnUnregister` / `OnSave` / `OnExternalChanges` /
+`OnExternalChangesPostLoad`.
 
-### Identity: persist the path, not the id
+### Identifying a Resource: the Path Beats the Id
 
 On `Resource` (`Resources/Resource.cs`):
 
 | Member | Notes |
 |---|---|
-| `string ResourcePath` | The canonical identifier. **Persist this.** (`:26`) |
-| `string ResourceName` | Filename without extension (`:32`) |
-| `int ResourceId` | **`[Obsolete]`**, a 32-bit hash of the path (`:16-17`) |
+| `string ResourcePath` | The canonical identifier, **the one to persist.** (`:26`) |
+| `string ResourceName` | Just the filename, extension stripped (`:32`) |
+| `int ResourceId` | **`[Obsolete]`**: a 32-bit hash derived from the path (`:16-17`) |
 
-Over the network a resource reference costs 8 bytes: `Resource` implements
-`BytePack.ISerializer` and writes only its 64-bit path hash
-(`Resource.cs:171-193`), resolving it on the far side from the already-loaded index, or
-loading from disk if the client hasn't touched it yet. That is why a `GameResource`
-reference is legal inside a `[Sync]` struct or a `NetList<T>` element.
+Sending a resource reference over the network costs 8 bytes: `Resource` implements
+`BytePack.ISerializer` and writes only the 64-bit hash of its path
+(`Resource.cs:171-193`). The receiving end resolves that hash against its own loaded
+index, or pulls the asset from disk if it hasn't seen it yet, which is exactly why a
+`GameResource` reference is safe to drop inside a `[Sync]` struct or a `NetList<T>`
+element.
 
-> Authoring a resource asset from outside the editor has its own gotchas (nothing watches
-> your source file). See `field-notes.md` → *Authoring a GameResource
-> Asset by Hand*.
+> Editing a resource file from outside the editor has its own trap: nothing watches the
+> source for changes. See `field-notes.md` → *Authoring a GameResource
+> Asset by Hand* for the details.
 
 ---
 

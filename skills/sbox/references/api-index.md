@@ -25,26 +25,26 @@ A line in this schema proves the member exists and its exact signature. It does 
 
 | Namespace | Types | Notes |
 |---|---|---|
-| `Sandbox` | 289 | Core runtime: animation, assets, services, scene utilities |
-| `(global)` | 174 | Math types (Vector2, Matrix), interfaces (IDamageable, ICollisionListener), animation events |
-| `Sandbox.UI` | 79 | Styling enums (Align, FlexDirection, etc.), CSS value types (Length, Shadow) |
+| `Sandbox` | 289 | The core runtime: animation, assets, services, scene utilities |
+| `(global)` | 174 | Math types (Vector2, Matrix), interfaces (IDamageable, ICollisionListener), and animation events |
+| `Sandbox.UI` | 79 | Styling enums (Align, FlexDirection, and the like) plus CSS value types (Length, Shadow) |
 | `Sandbox.UI.Construct` | 4 |  |
-| `Sandbox.Network` | 12 | Bandwidth stats, network message types |
-| `Sandbox.Physics` | 10 | Physics helpers, collision primitives |
-| `Sandbox.Audio` | 16 | DSP processors, audio graph nodes |
-| `Sandbox.VR` | 13 | VR input, hand tracking, controller data |
-| `Sandbox.Movement` | 1 | Movement helpers |
-| `Sandbox.Navigation` | 5 | NavMesh path, link, area types |
-| `Sandbox.Rendering` | 15 | Render targets, materials, post-processing API |
-| `Sandbox.Resources` | 14 | Resource loading, asset management |
-| `Sandbox.Services` | 14 | Leaderboards, achievements, stats, server browser |
+| `Sandbox.Network` | 12 | Bandwidth stats and the network message types |
+| `Sandbox.Physics` | 10 | Physics helpers and collision primitives |
+| `Sandbox.Audio` | 16 | DSP processors and audio graph nodes |
+| `Sandbox.VR` | 13 | VR input, hand tracking, and controller data |
+| `Sandbox.Movement` | 1 | A movement helper |
+| `Sandbox.Navigation` | 5 | NavMesh path, link, and area types |
+| `Sandbox.Rendering` | 15 | Render targets, materials, and the post-processing API |
+| `Sandbox.Resources` | 14 | Resource loading and asset management |
+| `Sandbox.Services` | 14 | Leaderboards, achievements, stats, and the server browser |
 | `Sandbox.Services.Players` | 2 |  |
-| `Sandbox.Diagnostics` | 8 | Performance profiling, allocations |
+| `Sandbox.Diagnostics` | 8 | Performance profiling and allocation tracking |
 | `Sandbox.Localization` | 4 |  |
-| `Sandbox.Utility` | 12 | Noise, SVG, general utilities |
+| `Sandbox.Utility` | 12 | Noise, SVG, and other general-purpose utilities |
 | `Sandbox.Utility.Svg` | 17 |  |
-| `Sandbox.ActionGraphs` | 10 | Visual scripting graph types |
-| `Sandbox.Clutter` | 10 | Clutter/scatter system |
+| `Sandbox.ActionGraphs` | 10 | The visual scripting graph types |
+| `Sandbox.Clutter` | 10 | The clutter/scatter system |
 | `Sandbox.Volumes` | 2 | Volume primitives |
 | `Sandbox.Bind` | 4 |  |
 | `Sandbox.Compression` | 1 |  |
@@ -94,9 +94,9 @@ A wrapper that holds an instance of any concrete type assignable to `T`
 - `AppId : UInt64`, `IsUnitTest : bool`, `IsHeadless : bool`
 
 ### AssetTypeAttribute (class)
-Marks a `GameResource` subclass as storable as an asset on disk. **Use this, not the
-obsolete `[GameResource(...)]`.** Set via property initializers, not ctor args:
-`[AssetType( Name = "Item", Extension = "item", Category = "Game" )]`
+Marks a `GameResource` subclass as storable on disk as an asset. **This is what you want,
+not the obsolete `[GameResource(...)]`.** Configure it with property initializers rather
+than constructor arguments: `[AssetType( Name = "Item", Extension = "item", Category = "Game" )]`
 - `Name : string`, `Extension : string`, `Category : string` (default `"Other"`), `Flags : AssetTypeFlags`, `IconColor : string`, `static FindTypeByExtension( string extension ) → TypeDescription`
 - Full usage, on-disk JSON format and loading: `api-core.md` → *GameResource & `[AssetType]`*
 
@@ -297,16 +297,16 @@ Game controller codes, driven from SDL
 Values: None, A, B, X, Y, SwitchLeftMenu, Guide, SwitchRightMenu, LeftJoystickButton, RightJoystickButton … (+15 more)
 
 ### GameResource (class)
-Assets defined in C# and created through tools. Derive from this and mark the class with
-`[AssetType]`; see `api-core.md` → *GameResource & `[AssetType]`*
+The base for assets defined in C# and created through tools: derive from it and tag the
+class with `[AssetType]`. See `api-core.md` → *GameResource & `[AssetType]`*
 - `HasUnsavedChanges : bool`, `ResourceVersion : int`, `IsValid : bool`, `StateHasChanged(  ) → void`, `GetReferencedPackages(  ) → IEnumerable<string>`
 - From `Resource`: `ResourcePath : string` (persist this), `ResourceName : string`, `ResourceId : int` (**obsolete**)
 
 ### GameResourceAttribute (class)
-**`[Obsolete( "Use AssetType instead" )]`**, a hard build failure under
-`TreatWarningsAsErrors`. Subclasses `AssetTypeAttribute`; its `Icon` / `IconBgColor` /
-`IconFgColor` / `CanEmbed` / `Description` members have no replacement except
-`AssetTypeAttribute.IconColor` and `AssetTypeFlags.NoEmbedding`
+**`[Obsolete( "Use AssetType instead" )]`**: using it fails the build outright under
+`TreatWarningsAsErrors`. It subclasses `AssetTypeAttribute`, and its `Icon` /
+`IconBgColor` / `IconFgColor` / `CanEmbed` / `Description` members went away with nothing
+to replace them but `AssetTypeAttribute.IconColor` and `AssetTypeFlags.NoEmbedding`
 
 ### GameTask (class)
 A generic `TaskSource`
@@ -582,11 +582,11 @@ Describes a change to a `NetDictionary`2` which is passed to `OnChanged` wheneve
 - `Type : Collections.Specialized.NotifyCollectionChangedAction`, `Key : TKey`, `NewValue : TValue`
 
 ### NetList<T> (class)
-A networkable list for use with the `SyncAttribute` and `HostSyncAttribute`. Sends deltas,
-not the whole list
+A list built to network over `SyncAttribute` and `HostSyncAttribute`: it ships deltas
+across the wire, not the whole collection each time
 - `Clear(  ) → void`, `RemoveAt( int index ) → void`, `Dispose(  ) → void`, `Contains( T item ) → bool`, `Count : int`
-- `OnChanged : Action<NetListChangeEvent<T>>` is a **public field**, not an event. Subscribe with `+=`. `[Change]` does not work on a `NetList` property (it wraps the property setter, so it only fires on reassignment)
-- Mutations are silently no-ops on a non-controller. Initialize once with `= new()` and never reassign after spawn. See `multiplayer.md` → *Networked Collections*
+- `OnChanged : Action<NetListChangeEvent<T>>` looks like an event but is a **public field**; subscribe with `+=`. `[Change]` won't fire on a `NetList` property either, since it wraps the setter and only reacts to reassignment
+- A non-controller's mutations are silent no-ops. Set it once with `= new()` and don't reassign it after spawn. See `multiplayer.md` → *Networked Collections*
 
 ### NetListChangeEvent<T> (struct)
 Describes a change to a `NetListChangeEvent`1` which is passed to `OnChanged` whenever its contents change
@@ -776,9 +776,9 @@ A GameResource type that adds extended properties to another resource type
 - `ExtensionDefault : bool`, `ExtensionTargets : List<T>`
 
 ### ResourceLibrary (class)
-Keeps a library of all available `Resource`
+The registry holding every available `Resource`
 - `static Get( string filepath ) → T`, `static TryGet( string filepath, out T resource ) → bool`, `static GetAll(  ) → IEnumerable<T>`, `static GetAll( string folder, bool recursive = true ) → IEnumerable<T>`, `static LoadAsync( string path ) → Task<T>`, `static GetThumbnail( string path, int width = 256, int height = 256 ) → Task<Bitmap>`
-- `static Get( int identifier ) → T` is **obsolete**: identifier-based access will be removed
+- `static Get( int identifier ) → T` is **obsolete**: identifier-based lookup is on its way out
 - `ResourceLibrary.IEventListener`: `OnRegister`, `OnUnregister`, `OnSave`, `OnExternalChanges`, `OnExternalChangesPostLoad`
 
 ### ResourcePublishContext (class)
@@ -1448,12 +1448,12 @@ Holds the backend state for a Gizmo scope
 - `Position : Vector3`, `Rotation : Rotation`, `Scale : float`
 
 ### IPressable (interface)
-A component that can be pressed: the "walk up and press E" interface. Nested on
+The "walk up and press E" interface, for anything a player can press. It's nested on
 `Component`, so declare it as `Component.IPressable`
 - `Press( Component.IPressable.Event e ) → bool` (**the only required member**), `CanPress( e ) → bool`, `Pressing( e ) → bool`, `Release( e ) → void`, `Hover( e ) → void`, `Look( e ) → void`, `Blur( e ) → void`, `GetTooltip( e ) → Component.IPressable.Tooltip?`
-- `Event` : `record struct ( Component Source, Ray? Ray = default )`. `Source` is the pressing `PlayerController`
+- `Event` : `record struct ( Component Source, Ray? Ray = default )`, where `Source` is the pressing `PlayerController`
 - `Tooltip` : `record struct ( string Title, string Icon, string Description, bool Enabled = true, IPressable Pressable = default )`
-- **`Press` runs on the pressing client, not the host.** See `scene-and-components.md` → *IPressable*
+- **`Press` fires on the pressing client, never the host.** See `scene-and-components.md` → *IPressable*
 
 ### ISceneEditorSession (interface)
 - `Scene : Scene`, `HasUnsavedChanges : bool`, `Selection : SelectionSystem`, `AddSelectionUndo(  ) → void`, `GetSelection(  ) → IEnumerable<object>`
@@ -2787,4 +2787,4 @@ A speech synthesis stream
 
 ---
 
-*Extracted from the s\&box engine's managed API surface at version 26.08.05: 738 types across 32 namespaces. The extraction excludes operators.*
+*Pulled from the s\&box engine's managed API surface at version 26.08.05: 738 types spread across 32 namespaces, operator overloads aside.*

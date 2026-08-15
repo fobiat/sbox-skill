@@ -91,8 +91,8 @@ Connection.Find( id )  // find by Guid
 
 ### Global Networking State
 
-| Property | Description |
-|----------|-------------|
+| Property | What It Tells You |
+|---|---|
 | `Networking.IsHost` | True when you're the host, or when not connected at all |
 | `Networking.IsClient` | True when connected but not the host |
 | `Networking.IsActive` | True while a connection is live |
@@ -234,7 +234,7 @@ void OnHealthChanged( float oldValue, float newValue )
 
 Four rules apply to both, and every one of them fails quietly if broken.
 
-**1. Change notification is a field, not `[Change]`.**
+**1. You catch changes through a field, not the `[Change]` attribute.**
 
 ```csharp
 [Sync( SyncFlags.FromHost )] public NetList<ItemEntry> Items { get; set; } = new();
@@ -469,8 +469,8 @@ Determines the fallback the moment an owner drops off:
 go.Network.SetOrphanedMode( NetworkOrphaned.Host );
 ```
 
-| Mode | Behavior |
-|------|----------|
+| Mode | What Happens |
+|---|---|
 | `NetworkOrphaned.Destroy` **(default)** | The object is destroyed |
 | `NetworkOrphaned.Host` | Ownership passes to the host |
 | `NetworkOrphaned.Random` | Ownership passes to a random client |
@@ -478,8 +478,8 @@ go.Network.SetOrphanedMode( NetworkOrphaned.Host );
 
 ### Network Accessor (go.Network)
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | Meaning |
+|---|---|---|
 | `Active` | `bool` | Whether this object is networked at all |
 | `IsOwner` | `bool` | Whether we're the owner |
 | `Owner` | `Connection` | The owning connection, or null if there isn't one |
@@ -504,8 +504,8 @@ Worth knowing on the same accessor:
 
 ### NetworkFlags
 
-| Flag | Effect |
-|------|--------|
+| Flag | What It Does |
+|---|---|
 | `NetworkFlags.NoInterpolation` | Turns off transform interpolation |
 | `NetworkFlags.NoPositionSync` | Leaves position out of sync |
 | `NetworkFlags.NoRotationSync` | Leaves rotation out of sync |
@@ -657,8 +657,8 @@ A ready-made component that covers basic multiplayer setup with no custom code:
 // Optionally add SpawnPoint components to the scene
 ```
 
-| Property | Description |
-|----------|-------------|
+| Property | What It Does |
+|---|---|
 | `StartServer` | Creates a lobby automatically when the scene loads |
 | `PlayerPrefab` | The prefab spawned for each connecting player |
 | `SpawnPoints` | A list of spawn locations, chosen from at random |

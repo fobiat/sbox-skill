@@ -99,7 +99,7 @@ Worth flagging:
 - `IHealthEvents.Post` stays local to the machine that raised it. Death effects everyone
   needs to see belong on a `[Rpc.Broadcast]`, not a scene event.
 
----
+***
 
 ## Example 2: First-Person Character Controller
 
@@ -179,16 +179,16 @@ public sealed class FirstPersonController : Component
 }
 ```
 
-Setup in the scene:
-1. GameObject with `FirstPersonController` + `CharacterController` (auto-added).
-2. A child `GameObject` named `CameraPivot` with a `CameraComponent`. Drag it into the `CameraPivot` property.
-3. Make sure the `CharacterController`'s `Height` / `Radius` match your player size (e.g., 72 / 16).
+Scene setup:
+1. Add `FirstPersonController` to a GameObject; it pulls in `CharacterController` automatically.
+2. Give it a child GameObject called `CameraPivot` carrying a `CameraComponent`, then drag that child into the `CameraPivot` slot.
+3. Set the `CharacterController`'s `Height` and `Radius` to match your player capsule; 72 and 16 are reasonable defaults.
 
 `OnFixedUpdate` runs movement rather than `OnUpdate` because the character controller
 does solver iterations and ground-sticking on a fixed step. Drive it from a variable-rate
 update instead and you get jitter and jumps that land differently depending on frame rate.
 
----
+***
 
 ## Example 3: Hitscan Weapon with Networked Effects
 
@@ -284,7 +284,7 @@ Worth flagging:
 - `IgnoreGameObjectHierarchy( GameObject.Root )` keeps the weapon from hitting itself even
   when it's nested several levels deep under the player.
 
----
+***
 
 ## Example 4: Networked Game Manager & Player Spawning
 
@@ -369,7 +369,7 @@ Worth flagging:
   covers objects that were **newly** spawned. Anything that changed hands afterward isn't
   guaranteed to follow that default, so cleaning up explicitly is the safer bet.
 
----
+***
 
 ## Example 5: Networked Player with Sync, RPCs, and Proxy Safety
 
@@ -444,7 +444,7 @@ Worth flagging:
 - `IGameObjectNetworkEvents.NetworkOwnerChanged` fires for every client, which makes it
   the hook for flipping between first-person and third-person visuals as ownership moves.
 
----
+***
 
 ## Example 6: Razor HUD Panel with Data Binding
 
@@ -580,7 +580,7 @@ Worth flagging:
   it's a single `GetAllComponents` call across the scene, O(n) but small; a large scene
   would want that reference cached in `OnStart` instead.
 
----
+***
 
 ## Example 7: Physics Grenade with Trigger Proximity & Explosion
 
@@ -688,7 +688,7 @@ Worth flagging:
 - `falloff = 1 - distance / radius` gives a linear curve. Reach for `MathX.LerpInverse`
   instead if a different falloff shape is wanted.
 
----
+***
 
 ## Example 8: NavMeshAgent AI with State Machine
 
@@ -862,7 +862,7 @@ Worth flagging:
 - The anim graph's move-speed parameter is driven off `Agent.Velocity.Length`; the same
   approach carries over to `CitizenAnimationHelper.WithVelocity` for the stock rig.
 
----
+***
 
 ## Example 9: Prefab Spawner with Pool-Friendly Lifecycle
 
@@ -945,7 +945,7 @@ Worth flagging:
   through `OnDestroy` and a single switch, `GameObject.Enabled = false`, to disable the
   whole group at once.
 
----
+***
 
 ## Example 10: Trigger Zone (Pickup / Checkpoint)
 
@@ -1016,35 +1016,37 @@ public sealed class HealthPickup : Component, Component.ITriggerListener
 }
 ```
 
-Setup:
-1. GameObject with `BoxCollider` (or `SphereCollider`), `IsTrigger` set to `true`.
-2. Add the `HealthPickup` component.
-3. Drag the child `ModelRenderer` into the `Visual` property.
-4. Mark players with the `"player"` tag (on the root player GameObject).
+To wire this up:
+1. Give the GameObject a `BoxCollider` (or `SphereCollider`) and switch `IsTrigger` to `true`.
+2. Attach the `HealthPickup` component to that GameObject.
+3. Point the `Visual` property at the child `ModelRenderer`.
+4. Tag the root player GameObject `"player"`, that's what the trigger check looks for.
 
-Key points:
-- Only the host handles the pickup. Other clients just see the `_available` sync value
-  and the RPCs land on their end automatically.
-- `[Sync]` on a backing field exposes the state to clients so a player who joins late
-  still sees pickups that are currently consumed, instead of seeing them all as available.
-- `Task.DelaySeconds` on a `Component` auto-cancels when the pickup is destroyed, via the
-  implicit `Component.Task` scope.
-- Don't forget to set `IsTrigger = true` on the collider. Skip it and you get physics
-  collisions instead of trigger events, and the pickup turns into a solid wall.
+Worth flagging:
+- The host is the only machine that processes the pickup. Everyone else just observes the
+  synced `_available` value and receives the RPCs as they land.
+- Putting `[Sync]` on the backing field means a player joining mid-match still sees
+  already-consumed pickups as consumed, instead of everything looking freshly available.
+- `Task.DelaySeconds` running on a `Component` cancels itself automatically once the
+  pickup is destroyed, courtesy of the implicit `Component.Task` scope.
+- Leaving `IsTrigger = true` off the collider turns this into a solid wall: physics
+  collisions fire instead of trigger events, and the pickup blocks the player outright.
 
----
+***
 
 ## Example 11: Walk Up and Press E (`IPressable`)
 
-Example 10 fires when you *walk into* something. This one fires when you *deliberately
-use* it, the stock `PlayerController`'s USE pipeline. It's the pattern for doors, buttons,
-levers, vending machines, world pickups, and NPC dialogue.
+The previous example triggers on overlap, walking straight into something. This one
+needs a deliberate action instead, routed through the stock `PlayerController`'s USE
+pipeline. Reach for it with doors, buttons, levers, vending machines, world pickups, and
+anywhere NPC dialogue needs to hook in.
 
 **The one thing to get right:** `Press()` executes on the **pressing client**, because
-the whole pipeline runs from `PlayerController.OnUpdate` inside `if ( !IsProxy )`. It's
-local input handling, not a network event. Anything authoritative, spawning, giving money,
-changing shared state, has to be an `[Rpc.Host]` that re-validates rather than trusting
-what the client sent. This is exactly how the engine's own `Door` is built.
+the whole pipeline runs from `PlayerController.OnUpdate` inside `if ( !IsProxy )`. That
+makes it local input handling rather than a network event. Anything authoritative, giving
+money, spawning something, changing shared state, needs an `[Rpc.Host]` that re-checks
+everything instead of trusting the client's word. It's exactly how the engine builds its
+own `Door`.
 
 ```csharp
 using Sandbox;
@@ -1116,66 +1118,70 @@ public sealed class Vendor : Component, Component.IPressable
 }
 ```
 
-Setup:
-1. GameObject with a **non-trigger** `Collider` (the USE trace calls `HitTriggers()`, so
-   a trigger works too, but a solid collider is what stops you pressing through walls).
-2. Add the `Vendor` component. No tags, no listener registration: implementing the
-   interface is the whole wiring.
-3. The player needs the stock `PlayerController` with `EnablePressing` (default on) and
-   `UseLookControls` (default on).
+Wiring it up:
+1. Give the GameObject a **non-trigger** `Collider` (the USE trace calls `HitTriggers()`,
+   so a trigger would technically work, but a solid collider is what stops players
+   pressing through walls).
+2. Attach the `Vendor` component. There's no tag to add and nothing to register
+   elsewhere, implementing the interface is the entire hookup.
+3. The player GameObject needs the stock `PlayerController`, with `EnablePressing` and
+   `UseLookControls` left at their default of on.
 
-Key points:
-- **Only `Press` is required.** Everything else on `IPressable` has a default body, so
-  omit whatever you don't need.
-- `e.Source` is the pressing `PlayerController`; `e.Source.GameObject` is the player.
-- The interface is found with `GetComponentsInParent<IPressable>( includeSelf: true )`
-  from the collider that was hit, so it can live on a parent of the visual or collider
-  rather than directly on it.
-- Reach is `ReachLength` (130 units) from the eye, retried at radius 0, 2 and 4 so small
-  props aren't fiddly to click. Distance is measured to the closest point on any child
-  collider, not the object's origin.
-- `CanPress` runs every frame for whatever you're looking at, and gates the tooltip as
-  well as the press. Keep it cheap and local, this is not the place for a trace or a
-  database lookup.
-- Draw your own prompt from `playerController.Tooltips`, it's rebuilt every frame.
-- Returning `true` from `Press` promises a later `Release`. Handle the edge cases: the
-  player can die, disconnect, or walk out of range mid-press (the controller calls
-  `StopPressing` when distance exceeds `ReachLength`).
+Worth flagging:
+- **`Press` is the only method that's mandatory.** Every other member of `IPressable`
+  ships with a default body, so skip whatever this Vendor doesn't need.
+- `e.Source` names the `PlayerController` doing the pressing; reach the player's
+  GameObject itself through `e.Source.GameObject`.
+- Resolution happens via `GetComponentsInParent<IPressable>( includeSelf: true )`,
+  starting from whichever collider got hit, so the component doesn't have to sit directly
+  on that collider, a parent works too.
+- The press trace reaches `ReachLength` (130 units) from the eye and retries at radius 0,
+  2 and 4, sparing small props from needing pixel-perfect aim. Distance is measured to
+  the nearest point on any child collider, not the object's origin.
+- `CanPress` runs every single frame against whatever's under the crosshair, and it
+  controls the tooltip as much as the press itself. Keep it cheap and local, a trace or a
+  database lookup has no business running here.
+- The tooltip prompt itself comes from `playerController.Tooltips`, rebuilt each frame;
+  draw your own UI from that.
+- A `Press` that returns `true` is a promise that `Release` will follow. Cover the ways
+  that promise can go unfulfilled: the player dying, disconnecting, or walking out of
+  range mid-press, which is when the controller calls `StopPressing` once distance passes
+  `ReachLength`.
 
----
+***
 
-## Quick-Reference Patterns
+## Idioms Worth Memorizing
 
-These are idioms that show up everywhere. Keep them in muscle memory.
+These snippets turn up constantly. Get them into muscle memory.
 
-### Local-player query
+### Finding the local player
 
 ```csharp
 var localPlayer = Scene.GetAllComponents<Player>().FirstOrDefault( p => !p.IsProxy );
 ```
 
-Cache in `OnStart` if you query it every frame.
+If you're calling this every frame, cache the result in `OnStart` instead.
 
-### "Do this on the host only"
+### Host-only logic
 
 ```csharp
 if ( !Networking.IsHost ) return;
 ```
 
-### "Do this on the owner only"
+### Owner-only logic
 
 ```csharp
 if ( IsProxy ) return;
 ```
 
-### "Do this on everyone with authoritative data"
+### Everyone, driven by authoritative data
 
 ```csharp
 [Rpc.Broadcast]
 void DoThing( Vector3 pos ) { /* runs everywhere */ }
 ```
 
-### Schedule work after a delay
+### Delayed work
 
 ```csharp
 _ = DelayedWork();
@@ -1188,7 +1194,7 @@ async Task DelayedWork()
 }
 ```
 
-### Trace from crosshair
+### Crosshair trace
 
 ```csharp
 var ray = Scene.Camera.ScreenNormalToRay( new Vector3( 0.5f, 0.5f, 0f ) );
@@ -1198,7 +1204,7 @@ var tr = Scene.Trace.Ray( ray, 5000f )
     .Run();
 ```
 
-### Find all players and iterate
+### Iterating every player
 
 ```csharp
 foreach ( var player in Scene.GetAllComponents<Player>() )
@@ -1208,7 +1214,7 @@ foreach ( var player in Scene.GetAllComponents<Player>() )
 }
 ```
 
-### Broadcast an effect without syncing a GameObject
+### Effect broadcast without a synced GameObject
 
 ```csharp
 [Rpc.Broadcast( NetFlags.Unreliable )]
@@ -1218,19 +1224,19 @@ void PlayEffect( Vector3 position )
 }
 ```
 
-### Guard against destroyed references
+### Destroyed-reference guard
 
 ```csharp
 if ( !target.IsValid() ) return;           // works on GameObject, Component, and any IValid
 ```
 
-### Tag-based collision filter (cheaper than type checks)
+### Filtering collisions by tag instead of type
 
 ```csharp
 if ( !other.GameObject.Tags.Has( "player" ) ) return;
 ```
 
-### One-shot sound
+### Playing a sound once
 
 ```csharp
 Sound.Play( "ui.click" );                                // 2D
@@ -1238,35 +1244,35 @@ Sound.Play( "impact.metal", hitPosition );               // 3D
 GameObject.PlaySound( soundEventAsset, Vector3.Zero );   // attached to GO
 ```
 
----
+***
 
-## Anti-Patterns
+## Common Mistakes
 
-If you find yourself writing one of these, stop.
+Catch yourself writing any of these, and stop.
 
-| Wrong | Right | Why |
-|---|---|---|
-| `Update()` | `protected override void OnUpdate()` | s&box isn't Unity; the virtual method is `OnUpdate`. |
-| `GetComponent<T>()` in a hot loop | Cache the reference in `OnStart` | Component lookup is cheap but not free; 60x per second on 100 objects is waste. |
-| Reading `Input.*` in `OnFixedUpdate` | Read in `OnUpdate`, store, consume in `OnFixedUpdate` | Input polling is tied to frame rate, not physics tick. `Pressed`/`Released` may be missed. |
-| Mutating `[Sync]` fields on a proxy | Guard with `if ( IsProxy ) return;` | Clients overwrite each other; the value snaps back on the next sync. |
-| `Scene.GetAllComponents<T>()` in `OnUpdate` on every object | Cache or use scene events | O(scene) x O(components) quickly becomes the frame budget. |
-| `Instantiate(prefab)` / `gameObject.SetActive(false)` | `prefab.Clone(pos)` / `go.Enabled = false` | These are Unity APIs that don't exist here. |
-| `Debug.Log(...)` | `Log.Info(...)` | Unity name, doesn't exist. |
-| `new Thread(...)` or raw `System.IO.File` | s&box `FileSystem.Data` and async/await | Most of `System.IO` is blocked by the sandbox whitelist. |
-| `transform.position = ...` | `WorldPosition = ...` | `transform` isn't a field; Transform access is via `WorldPosition` / `LocalPosition` shortcuts. |
-| Calling `[Rpc.Broadcast]` methods on proxies without owner check | Guard with `IsProxy` / `Networking.IsHost` as appropriate | Every proxy re-firing an RPC multiplies the message count. |
-| Building UI in C# imperatively every frame | Razor with `BuildHash` | Razor diffing is cheap; rebuilding the DOM from scratch is not. |
-| Mutating authoritative state directly inside `IPressable.Press` | Do it in an `[Rpc.Host]` and re-validate there | `Press` runs on the pressing client. The write either gets dropped silently or trusts a client. |
-| `go.NetworkSpawn()` with no arguments | `go.NetworkSpawn( Connection.Host )` or `( owner )` | The bare form owns to `Connection.Local`, whoever ran the line. |
-| Assuming a scene-placed object replicates `[Sync]` | `NetworkSpawn` it, or accept snapshot-only state | `NetworkMode.Snapshot` is the default and doesn't live-sync, but RPCs still work, so it looks fine until it doesn't. |
-| Reassigning a `NetList<T>` property to clear it | `list.Clear()` | The replacement never gets wired to the network table and loses its proxy guard. |
-| `[Change]` on a `NetList` / `NetDictionary` property | Subscribe to the collection's `OnChanged` field | `[Change]` wraps the property setter, so element mutations never fire it. |
-| `[GameResource( "Title", "ext", "desc" )]` | `[AssetType( Name = ..., Extension = ... )]` | Obsolete engine-wide; a build failure under `TreatWarningsAsErrors`. |
-| Using `Model.Load(path)` without a null check | Check for null, fall back to `Model.Error` | A path that doesn't resolve returns null, not the placeholder. |
-| Using `Prop` for a decorative or non-destructible object | `ModelRenderer` + `ModelCollider` (+ `Rigidbody`) | `Prop` brings synced `Health`, `IDamageable` and gibs you didn't ask for. |
+| Instead of | Use | Reason |
+|:--|:--|:--|
+| `Update()` | `protected override void OnUpdate()` | There's no bare `Update()` in s&box; the lifecycle method is `OnUpdate`. |
+| `GetComponent<T>()` in a hot loop | Cache the reference inside `OnStart` | Lookup isn't free, and 60 calls a second across 100 objects adds up to real waste. |
+| Polling `Input.*` from inside `OnFixedUpdate` | Read it in `OnUpdate`, cache the result, and consume that in `OnFixedUpdate` | Input polling tracks frame rate rather than the physics tick, so `Pressed`/`Released` states can slip through unnoticed. |
+| Writing to a `[Sync]` field from a proxy | Guard the write with `if ( IsProxy ) return;` | Clients would stomp on each other's writes, and the value snaps right back on the next sync anyway. |
+| Calling `Scene.GetAllComponents<T>()` from `OnUpdate` on every object | Cache the result once, or switch to scene events | Cost scales as scene size times component count, and that eats the frame budget fast. |
+| `Instantiate(prefab)` / `gameObject.SetActive(false)` | `prefab.Clone(pos)` / `go.Enabled = false` | Both are Unity calls; neither exists in s&box. |
+| `Debug.Log(...)` | `Log.Info(...)` | That's the Unity name; s&box doesn't have it. |
+| `new Thread(...)` or raw `System.IO.File` | s&box `FileSystem.Data` and async/await | The sandbox whitelist blocks most of `System.IO` outright. |
+| `transform.position = ...` | `WorldPosition = ...` | `transform` isn't a field here; reach the object's placement through the `WorldPosition` / `LocalPosition` shortcuts instead. |
+| Letting a proxy call `[Rpc.Broadcast]` methods without checking ownership | Add whichever of `IsProxy` / `Networking.IsHost` fits the call | Every proxy that re-fires the RPC multiplies the message traffic. |
+| Constructing UI imperatively in C# on every frame | Razor with `BuildHash` | Razor's diffing is cheap; rebuilding the whole DOM from scratch every frame isn't. |
+| Writing authoritative state straight from `IPressable.Press` | Move the write into an `[Rpc.Host]` that re-validates everything | `Press` executes on the pressing client, so that write either silently vanishes or blindly trusts whatever the client sent. |
+| `go.NetworkSpawn()` with no arguments | `go.NetworkSpawn( Connection.Host )` or `( owner )` | The bare call assigns ownership to `Connection.Local`, whichever machine happened to run that line. |
+| Expecting a scene-placed object to replicate `[Sync]` state | Call `NetworkSpawn` on it, or knowingly accept snapshot-only behavior | `NetworkMode.Snapshot` is the default and doesn't live-sync at all, but RPCs keep working regardless, so the gap stays invisible until it isn't. |
+| Clearing a `NetList<T>` by reassigning the property | `list.Clear()` | A freshly assigned list never gets wired into the network table, and it loses its proxy guard in the process. |
+| `[Change]` on a `NetList` / `NetDictionary` property | Subscribe to the collection's `OnChanged` field instead | `[Change]` only wraps the property setter, so mutating individual elements never trips it. |
+| `[GameResource( "Title", "ext", "desc" )]` | `[AssetType( Name = ..., Extension = ... )]` | Obsolete across the whole engine, and a build failure the moment `TreatWarningsAsErrors` is on. |
+| Calling `Model.Load(path)` and skipping the null check | Check for null and fall back to `Model.Error` | A path that fails to resolve comes back null, not the placeholder model. |
+| Reaching for `Prop` on something purely decorative or non-destructible | `ModelRenderer` + `ModelCollider` (+ `Rigidbody`) | `Prop` drags along synced `Health`, `IDamageable`, and gib behavior nobody asked for. |
 
----
+***
 
 *See the topical references (`scene-and-components.md`, `component-library.md`, `multiplayer.md`,
 `input-traces-and-physics.md`, `razor-interfaces.md`) for exhaustive API details. This file is for

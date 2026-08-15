@@ -10,11 +10,11 @@
             which is MIT licensed. See LICENSE at the repository root.
 -->
 
-# Built-in Components
+# Component Library
 
-This reference covers the component library you reach for constantly: rendering, physics, character movement, the player controller, props, inventory, camera, lighting, audio, navigation and effects, all pulled directly from engine source at version 26.08.05. Unless a line says otherwise, every type below sits in the `Sandbox` namespace.
+Every component you'll actually reach for day to day lives here: rendering, physics, character movement, the player controller, props, inventory, camera, lighting, audio, navigation and effects, each entry pulled straight from engine source at version 26.08.05. Every type below lives in the `Sandbox` namespace unless a line says otherwise.
 
----
+***
 
 ## Rendering
 
@@ -29,8 +29,8 @@ renderer.Tint = Color.Red;
 renderer.MaterialOverride = Material.Load( "materials/custom.vmat" );
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Model` | `Model` | The model asset being drawn |
 | `Tint` | `Color` | Multiplies the render color |
 | `MaterialOverride` | `Material` | Replaces every material on the model |
@@ -40,7 +40,7 @@ renderer.MaterialOverride = Material.Load( "materials/custom.vmat" );
 | `RenderType` | `ShadowRenderType` | Controls how shadows are cast |
 | `LodOverride` | `int?` | Pins rendering to a single LOD level |
 | `CreateAttachments` | `bool` | Spawns a child GameObject for each model attachment |
-| `Bounds` | `BBox` | World-space bounding box (read-only) |
+| `Bounds` | `BBox` | Axis-aligned bounds in world space, read-only |
 | `SceneObject` | `SceneObject` | The scene object this renderer wraps |
 
 Useful methods:
@@ -81,8 +81,8 @@ body.SetLookDirection( "aim_eyes", lookDirection );
 body.SetLookDirection( "aim_head", lookDirection, 0.5f );
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `CreateBoneObjects` | `bool` | Spawns a GameObject per bone |
 | `BoneMergeTarget` | `SkinnedModelRenderer` | Merges this model's bones onto another (clothing, attachments) |
 | `UseAnimGraph` | `bool` | Turns the animgraph on, usually disabled for ragdolls |
@@ -123,7 +123,7 @@ Useful methods:
 | `TrailRenderer` (sealed) | Leaves a trail behind a moving object. Properties: `Color`, `Width`, `Lifetime`, `Face`. |
 | `BeamEffect` (sealed) | A laser or beam-style visual. Properties: `Targets`, `Width`, `Color`, `Speed`. |
 
----
+***
 
 ## Physics
 
@@ -149,8 +149,8 @@ rb.ApplyImpulseAt( hitPosition, bulletForce );
 rb.SmoothMove( targetTransform, 0.1f, Time.Delta );
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Gravity` | `bool` | Whether gravity affects this body |
 | `GravityScale` | `float` | Multiplier applied to gravity |
 | `LinearDamping` | `float` | Damps linear velocity over time |
@@ -181,12 +181,12 @@ Useful methods:
 - `FindClosestPoint( Vector3 position )` → `Vector3`
 - `ResetInertiaTensor()`
 
-### Colliders
+### Collision Shapes
 
 Every collider shape derives from the abstract `Collider` base and shares this set of properties:
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `IsTrigger` | `bool` | Marks it a trigger volume with no physical response |
 | `Static` | `bool` | Marks the collider as non-moving |
 | `Friction` | `float?` | Overrides surface friction |
@@ -199,8 +199,8 @@ Every collider shape derives from the abstract `Collider` base and shares this s
 
 Each shape then contributes its own fields:
 
-| Component | Own Properties |
-|-----------|---------------|
+| Component | Shape-Specific Fields |
+|:--|:--|
 | `BoxCollider` (sealed) | `Vector3 Scale`, `Vector3 Center` |
 | `SphereCollider` (sealed) | `Vector3 Center`, `float Radius` |
 | `CapsuleCollider` | `Vector3 Start`, `Vector3 End`, `float Radius` |
@@ -236,21 +236,21 @@ protected override void OnFixedUpdate()
 }
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Radius` | `float` | Radius of the movement capsule |
 | `Height` | `float` | Height of the movement capsule |
 | `StepHeight` | `float` | Tallest step it can climb automatically |
 | `GroundAngle` | `float` | Steepest slope treated as walkable |
-| `Acceleration` | `float` | Internal acceleration factor |
+| `Acceleration` | `float` | Scales how quickly velocity ramps up internally |
 | `Bounciness` | `float` | 0 stops dead on a wall, 1 bounces fully |
-| `Velocity` | `Vector3` | Current velocity |
+| `Velocity` | `Vector3` | This tick's velocity vector |
 | `IsOnGround` | `bool` | Whether it's currently grounded |
 | `GroundObject` | `GameObject` | What it's currently standing on |
 | `GroundCollider` | `Collider` | The ground's collider |
 | `IgnoreLayers` | `TagSet` | Tags excluded from traces |
 | `UseCollisionRules` | `bool` | Whether project collision rules apply |
-| `BoundingBox` | `BBox` | Current collision bounds (read-only) |
+| `BoundingBox` | `BBox` | The controller's collision bounds right now, read-only |
 
 Useful methods:
 - `Move()`: moves along the current `Velocity`, tracing and sliding as it goes
@@ -260,12 +260,12 @@ Useful methods:
 - `Punch( Vector3 amount )`: detaches from the ground and adds velocity, useful for jumps
 - `TraceDirection( Vector3 direction )` → `SceneTraceResult`
 
-### Joints
+### Joint Types
 
 All joint types derive from the abstract `Joint` class and link two physics bodies together.
 
-| Joint Type | Description |
-|------------|-------------|
+| Joint Type | What It Constrains |
+|:--|:--|
 | `FixedJoint` (sealed) | Welds two objects together rigidly |
 | `HingeJoint` (sealed) | Rotation around a single axis, for doors and wheels. Properties: `MinAngle`, `MaxAngle`, `Friction`. |
 | `BallJoint` (sealed) | Free rotation, like a shoulder. Properties: `SwingLimit`, `TwistLimit`. |
@@ -273,7 +273,7 @@ All joint types derive from the abstract `Joint` class and link two physics bodi
 | `SpringJoint` (sealed) | A spring connection with configurable spring and damping values. |
 | `WheelJoint` (sealed) | Simulates a vehicle wheel. |
 
----
+***
 
 ## Camera
 
@@ -294,8 +294,8 @@ Ray ray = cam.ScreenPixelToRay( Mouse.Position );
 Vector2 screenPos = cam.PointToScreenPixels( worldPosition );
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `FieldOfView` | `float` | Field of view, in degrees |
 | `FovAxis` | `Axis` | Axis the FOV value applies to |
 | `ZNear` | `float` | Near clip plane distance |
@@ -324,7 +324,7 @@ Useful methods:
 - `RenderToTexture( Texture target, ViewSetup config = null )` → `bool`
 - `AddCommandList( CommandList list, Stage stage, int order )`: injects render commands at a given pipeline stage. See `references/shading-and-render-path.md`.
 
-**The old render hooks aren't merely deprecated, they're dead.** `AddHookAfterOpaque( string debugName, int order, Action<SceneCamera> effect )`, `AddHookAfterTransparent`, `AddHookBeforeOverlay` and `AddHookAfterUI` all carry `[Obsolete]` in 26.08.05 and their bodies return `null`. The call still compiles, still hands back a null `IDisposable`, and renders precisely nothing. Reach for `AddCommandList` with a `Stage` instead.
+**The old render hooks are flat-out dead in 26.08.05.** `AddHookAfterOpaque( string debugName, int order, Action<SceneCamera> effect )`, `AddHookAfterTransparent`, `AddHookBeforeOverlay` and `AddHookAfterUI` all carry `[Obsolete]`, and their bodies just return `null`. The call still compiles, still hands back a null `IDisposable`, and renders precisely nothing. Reach for `AddCommandList` with a `Stage` instead.
 
 ### HudPainter
 
@@ -342,14 +342,14 @@ protected override void OnUpdate()
 
 `Scene.Camera.Hud` renders before post-processing kicks in. `Scene.Camera.Overlay` sits above everything, post-processing included.
 
----
+***
 
 ## Lighting
 
 Every light type inherits from the abstract `Light` class:
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `LightColor` | `Color` | Light color, with intensity baked in |
 | `Shadows` | `bool` | Whether the light casts shadows |
 | `ShadowBias` | `float` | Bias applied to shadow depth |
@@ -357,16 +357,16 @@ Every light type inherits from the abstract `Light` class:
 | `FogMode` | `FogInfluence` | How this light interacts with fog |
 | `FogStrength` | `float` | Strength of that fog influence |
 
-### Light Types
+### Available Light Types
 
-| Component | Additional Properties |
-|-----------|----------------------|
+| Component | Extra Properties |
+|:--|:--|
 | `PointLight` | `float Radius`, `float Attenuation` |
 | `SpotLight` | `float Radius`, `float ConeOuter`, `float ConeInner`, `float Attenuation`, `Texture Cookie` |
 | `DirectionalLight` | `Color SkyColor`, `int ShadowCascadeCount`, `float ShadowCascadeSplitRatio` |
 | `AmbientLight` | `Color Color` (applied scene-wide) |
 
----
+***
 
 ## Audio
 
@@ -374,12 +374,12 @@ Every light type inherits from the abstract `Light` class:
 
 The shared base for any component that plays a positioned sound out in the world.
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `SoundEvent` | `SoundEvent` | The sound asset to play |
 | `PlayOnStart` | `bool` | Plays automatically once enabled |
-| `Volume` | `float` | Volume multiplier |
-| `Pitch` | `float` | Pitch multiplier |
+| `Volume` | `float` | Scales overall loudness |
+| `Pitch` | `float` | Scales playback pitch |
 | `Force2d` | `bool` | Ignores spatial positioning entirely |
 | `Repeat` | `bool` | Loops the sound |
 | `MinRepeatTime` / `MaxRepeatTime` | `float` | Range for a randomized repeat interval |
@@ -389,12 +389,12 @@ The shared base for any component that plays a positioned sound out in the world
 | `Occlusion` | `bool` | Whether geometry can occlude the sound |
 | `TargetMixer` | `MixerHandle` | Which audio mixer receives it |
 
-Methods: `StartSound()`, `StopSound()`
+Playback control: `StartSound()`, `StopSound()`
 
-### Concrete Sound Components
+### Sound Component Variants
 
-| Component | Description |
-|-----------|-------------|
+| Component | What It Plays |
+|:--|:--|
 | `SoundPointComponent` (sealed) | Plays a sound from a single point; the one you'll use most. |
 | `SoundBoxComponent` (sealed) | Plays a sound throughout a box volume. Extra property: `Vector3 Scale`. |
 | `AudioListener` (sealed) | Moves the listening point away from the camera. Property: `bool IsActive`. |
@@ -411,9 +411,9 @@ Sound.Play( mySoundEvent );
 Sound.Play( mySoundEvent, worldPosition );
 ```
 
----
+***
 
-## UI Components
+## UI Panels
 
 s&box builds its UI on Panels, an HTML/CSS-flavored layout system. These components form the bridge connecting a panel tree to the scene.
 
@@ -421,12 +421,12 @@ s&box builds its UI on Panels, an HTML/CSS-flavored layout system. These compone
 
 The root for screen-space (2D) UI. Attach it to any GameObject that has a `PanelComponent` child.
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Scale` | `float` | Overall UI scale |
 | `AutoScreenScale` | `bool` | Auto-scales toward a 1080p target (default: true) |
 | `ScaleStrategy` | `AutoScale` | Which scaling mode is used |
-| `Opacity` | `float` | Panel opacity |
+| `Opacity` | `float` | How transparent the panel renders |
 | `ZIndex` | `int` | Draw order |
 | `TargetCamera` | `CameraComponent` | Which camera renders this panel |
 
@@ -434,10 +434,10 @@ The root for screen-space (2D) UI. Attach it to any GameObject that has a `Panel
 
 Draws panels out in 3D world space. Add it to a GameObject, then hang `PanelComponent` children off it.
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `PanelSize` | `Vector2` | Panel dimensions in world units |
-| `RenderScale` | `float` | Resolution multiplier |
+| Property | Type | What it holds |
+|:---|:---|:---|
+| `PanelSize` | `Vector2` | Panel dimensions, measured in world units |
+| `RenderScale` | `float` | Multiplier applied to render resolution |
 | `LookAtCamera` | `bool` | Enables billboarding toward the camera |
 | `HorizontalAlign` / `VerticalAlign` | alignment enum | Alignment relative to the panel's position |
 | `InteractionRange` | `float` | Maximum distance for interaction |
@@ -467,13 +467,13 @@ public sealed class HealthDisplay : PanelComponent
 }
 ```
 
-Methods: `AddClass`, `RemoveClass`, `HasClass`, `SetClass`, `BindClass`, `StateHasChanged`
+Panel-class helpers: `AddClass`, `RemoveClass`, `HasClass`, `SetClass`, `BindClass`, `StateHasChanged`
 
 ### WorldInput (sealed)
 
 Routes mouse and keyboard input to `WorldPanel` components. Attach it to a camera or a VR controller.
 
----
+***
 
 ## Navigation
 
@@ -494,15 +494,15 @@ protected override void OnUpdate()
 }
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `MaxSpeed` | `float` | Top movement speed |
 | `Acceleration` | `float` | Rate of acceleration |
-| `Height` | `float` | Agent height |
-| `Radius` | `float` | Agent radius |
+| `Height` | `float` | How tall the agent is |
+| `Radius` | `float` | How wide the agent is |
 | `UpdatePosition` | `bool` | Syncs the GameObject's position (disable for custom traversal) |
 | `UpdateRotation` | `bool` | Syncs the GameObject's rotation |
-| `Velocity` | `Vector3` | Current velocity |
+| `Velocity` | `Vector3` | The agent's velocity right now |
 | `WishVelocity` | `Vector3` | Velocity the agent wants |
 | `IsNavigating` | `bool` | Whether it's currently moving toward a target |
 | `TargetPosition` | `Vector3?` | The active target, if any |
@@ -532,7 +532,7 @@ public sealed class JumpLink : NavMeshLink
 }
 ```
 
-Events: `Action<NavMeshAgent> LinkEntered`, `Action<NavMeshAgent> LinkExited`
+Fires: `Action<NavMeshAgent> LinkEntered`, `Action<NavMeshAgent> LinkExited`
 
 ### Querying the Scene NavMesh
 
@@ -549,7 +549,7 @@ Scene.NavMesh.CalculatePath( new CalculatePathRequest {
 })                                                     // calculate path
 ```
 
----
+***
 
 ## Gameplay
 
@@ -559,8 +559,8 @@ A complete first- or third-person player controller with input, camera, physics 
 
 Every feature listed below can be switched off individually via right-click on its tab in the inspector.
 
-| Feature | Key Properties |
-|---------|---------------|
+| Feature | Relevant Properties |
+|:--|:--|
 | **Body** | `BodyRadius`, `BodyHeight`, `BodyMass`, `BodyCollisionTags` |
 | **Input** | `UseInputControls`, `WalkSpeed`, `RunSpeed`, `DuckedSpeed`, `JumpSpeed` |
 | **Camera** | `UseCameraControls`, `ThirdPerson`, `HideBodyInFirstPerson`, `CameraOffset`, `EyeDistanceFromTop` |
@@ -568,9 +568,9 @@ Every feature listed below can be switched off individually via right-click on i
 | **Animator** | `UseAnimatorControls`, `Renderer` (SkinnedModelRenderer) |
 | **Pressing** | `EnablePressing` (default on), `UseButton` (default `"use"`), `ReachLength` (default `130`) |
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Velocity` | `Vector3` | Current velocity |
+| Property | Type | What it holds |
+|:---|:---|:---|
+| `Velocity` | `Vector3` | Velocity for the current tick |
 | `WishVelocity` | `Vector3` | Desired movement direction (set this to drive custom input) |
 | `EyeAngles` | `Angles` | Direction the player is looking (set this to drive custom input) |
 | `EyePosition` | `Vector3` | World-space eye position |
@@ -618,11 +618,11 @@ public sealed class MyListener : Component, PlayerController.IEvents
 
 **Job one: it self-assembles a renderer, collider and physics setup from a `Model`.** Assign `Model` and it constructs the rest for you (`Scene/Components/Game/Prop.cs:214-333`):
 
-| It creates | When |
-|---|---|
+| It creates | Trigger condition |
+|:--|:--|
 | `SkinnedModelRenderer` | `Model.BoneCount > 0` |
-| `ModelRenderer` | otherwise |
-| `ModelCollider` (`Static = true`) | `IsStatic` is set |
+| `ModelRenderer` | when that's not true |
+| `ModelCollider` (`Static = true`) | when `IsStatic` is on |
 | `ModelCollider` + `Rigidbody` | one physics part, inheriting mass, damping and gravity scale from the model |
 | `ModelPhysics` | multiple physics parts (ragdoll-style) |
 
@@ -630,11 +630,11 @@ Internally these are tracked as "procedural components," and `Prop` tears the wh
 
 **Job two: it's breakable, flammable, explosive and gibbable**, regardless of whether that's what you wanted. `[Property, Sync] float Health` seeds itself from `Model.Data.Health`, and from there you inherit `IDamageable.OnDamage`, `Ignite()`, `CreateExplosion()`, `Kill( DamageInfo )`, and `CreateGibs()` / `NetworkCreateGibs()` driven by the model's break-piece list, along with `OnPropBreak` / `OnGibsCreated` / `OnPropTakeDamage` action properties for hooking into any of it.
 
-| Member | Type | Notes |
-|---|---|---|
+| Member | Type | What to know |
+|:--|:--|:--|
 | `Model` | `Model` | Reassigning it rebuilds the procedural components |
 | `Health` | `float` | `[Property, Sync]`. Seeded automatically from `Model.Data.Health` |
-| `IsStatic` | `bool` | Static collider, no rigidbody |
+| `IsStatic` | `bool` | Gives it a static collider and skips the rigidbody |
 | `StartAsleep` | `bool` | Physics stays asleep until something wakes it |
 | `BodyGroups`, `MaterialGroup`, `Tint` | | Passed through to the renderer |
 | `IsFlammable`, `IsExplosive`, `IsOnFire` | `bool` | Sourced from `Model.Data` |
@@ -660,19 +660,19 @@ Reach for it when your items are held objects, weapons, tools, consumables, with
 
 **`BaseInventoryComponent`**
 
-| Member | Notes |
-|---|---|
+| Member | What it does |
+|:--|:--|
 | `Behaviour` | `Hotbar` (one item per slot, Rust/Minecraft style) or `Buckets` (category buckets ordered by `SlotOrder`, HL2 style). Defaults to `Hotbar` |
 | `MaxSlots` | Defaults to `6` |
 | `Items` | `IEnumerable<BaseInventoryItem>`, ordered by slot and then `SlotOrder` |
 | `ActiveItem` | `[Sync(FromHost), Change]`, private setter; call `Switch` instead |
-| `ActiveItemChanged` | `event Action<old, new>`, fires on every peer |
-| `Add( item, slot = -1 )` / `Pickup( prefab \| path, slot = -1 )` | Host only |
-| `Remove` / `Drop` | Routed through the host (`[Rpc.Host]`-wrapped `HostRemove` / `HostDrop`) |
+| `ActiveItemChanged` | `event Action<old, new>`, every peer gets notified |
+| `Add( item, slot = -1 )` / `Pickup( prefab \| path, slot = -1 )` | Host-side operation only |
+| `Remove` / `Drop` | Goes through the host, wrapped as `[Rpc.Host]` calls `HostRemove` / `HostDrop` |
 | `Transfer( item, toInventory, slot )` | **Host-only, and not routed**: `if ( !Networking.IsHost ) return false;` with no RPC wrapper (`BaseInventoryComponent.Actions.cs:189-190`), so a client-side call silently does nothing. Its own doc calls this out: "Games route their own requests here" |
 | `Switch( item, allowHolster = false )` / `SwitchToBest()` / `ForceHolster()` | |
 | `MoveSlot( from, to )` | Swaps items if the destination is occupied |
-| `GetSlot` / `GetSlotItems` / `FindEmptySlot` / `GetItem<T>` / `HasItem<T>` | Queries |
+| `GetSlot` / `GetSlotItems` / `FindEmptySlot` / `GetItem<T>` / `HasItem<T>` | Read-only lookups |
 | `virtual GetBestItem()` | Falls back to the highest `Value` item, skipping anything flagged `ShouldAvoid`. Runs on the host |
 | `OnAdding( item, slot )` / `OnRemoving( item )` / `OnDropping( item )` / `OnMovingSlot( from, to )` | Overridable gates; return `false` to block the action. Plus `OnItemAdded( item )` |
 
@@ -694,13 +694,13 @@ A marker for player spawn locations, used by `NetworkHelper` to decide where pla
 
 Stands up a networked lobby and hands out player prefabs to incoming connections.
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `PlayerPrefab` | `GameObject` | Prefab spawned for each connecting player |
 | `StartServer` | `bool` | Starts hosting automatically |
 | `SpawnPoints` | `bool` | Uses SpawnPoint components to decide placement |
 
----
+***
 
 ## Effects
 
@@ -708,8 +708,8 @@ Stands up a networked lobby and hands out player prefabs to incoming connections
 
 The core particle system: 66 configurable properties covering emission, simulation and rendering, though none of it produces anything visible until emitter and renderer child components are attached.
 
-- **Emitters**: `ParticleSphereEmitter`, `ParticleBoxEmitter`, `ParticleConeEmitter`, `ParticleRingEmitter`, `ParticleModelEmitter`
-- **Renderers**: `ParticleSpriteRenderer`, `ParticleModelRenderer`, `ParticleTrailRenderer`, `ParticleLightRenderer`, `ParticleTextRenderer`
+- **Emitter types**: `ParticleSphereEmitter`, `ParticleBoxEmitter`, `ParticleConeEmitter`, `ParticleRingEmitter`, `ParticleModelEmitter`
+- **Renderer types**: `ParticleSpriteRenderer`, `ParticleModelRenderer`, `ParticleTrailRenderer`, `ParticleLightRenderer`, `ParticleTextRenderer`
 - **Controllers**: `ParticleAttractor` and any custom `ParticleController` subclass
 
 ### LegacyParticleSystem
@@ -720,29 +720,29 @@ Plays back Source Engine `.vpcf` particle files.
 
 Destroys its own `GameObject` automatically once every child particle and sound has finished playing. Implement the `ITemporaryEffect` interface on your own components if you need them counted in that check too.
 
----
+***
 
 ## Environment
 
-| Component | Description |
-|-----------|-------------|
+| Component | What It Adds |
+|:--|:--|
 | `SkyBox2D` | A flat 2D skybox background |
 | `GradientFog` | Fog that fades by distance. Properties: `Start/EndDistance`, `Color`, `Height`. |
 | `CubemapFog` | A cubemap-driven fog effect |
 | `VolumetricFogVolume` | Volumetric fog rendered in 3D |
 | `EnvmapProbe` (sealed) | A cubemap reflection probe. Properties: `Resolution`, `Parallax`, bounds. |
 | `IndirectLightVolume` (sealed) | A grid of dynamic GI probes |
-| `Terrain` (sealed) | Heightmap-based terrain. Properties: `TerrainSize`, `HeightMapSize`, `ClipMapLodLevels`. |
+| `Terrain` (sealed) | Terrain generated from a heightmap. Properties: `TerrainSize`, `HeightMapSize`, `ClipMapLodLevels`. |
 | `MapInstance` | Loads a map (`.vpk` or `.scene`) into the current scene |
 
----
+***
 
 ## Post-Processing
 
 Attach these to a `GameObject` carrying a `CameraComponent`, or use `PostProcessVolume` instead if you want the effect confined to a region rather than applied across the whole camera.
 
-| Component | Key Properties |
-|-----------|---------------|
+| Component | Main Properties |
+|:--|:--|
 | `AmbientOcclusion` (sealed) | `Intensity`, `Radius`, `Quality` |
 | `Bloom` | `Threshold`, `Strength`, `Radius` |
 | `DepthOfField` (sealed) | `FocalDistance`, `FrontBlur`, `BackBlur`, `BlurSize` |
@@ -761,7 +761,7 @@ Attach these to a `GameObject` carrying a `CameraComponent`, or use `PostProcess
 
 `PostProcessVolume` fades its effects in and out based on where the camera sits, rather than applying them uniformly everywhere.
 
----
+***
 
 ## ModelPhysics (sealed)
 
@@ -774,8 +774,8 @@ physics.Model = physics.Renderer.Model;
 physics.MotionEnabled = true;  // start simulating
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Renderer` | `SkinnedModelRenderer` | The target model |
 | `Model` | `Model` | The physics model in use |
 | `MotionEnabled` | `bool` | Turns physics simulation on or off |
@@ -785,9 +785,9 @@ physics.MotionEnabled = true;  // start simulating
 
 Method: `CopyBonesFrom( SkinnedModelRenderer source, bool teleport )` copies bone positions across from another renderer. This is the call you reach for at the moment a live skeleton hands control off to its ragdoll.
 
----
+***
 
-## Citizen Animation Helper (sealed)
+## The Citizen Animation Helper (sealed)
 
 `Sandbox.Citizen.CitizenAnimationHelper` is a high-level animation controller purpose-built for the Citizen model.
 
@@ -806,15 +806,15 @@ protected override void OnUpdate()
 
 Drives animgraph parameters covering movement, look direction, hold types, ducking, and more besides.
 
----
+***
 
-## Voice
+## Voice Chat
 
 The `Voice` component captures microphone input and transmits it to other players over multiplayer.
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property | Type | What it holds |
+|:---|:---|:---|
 | `Mode` | `VoiceMode` | Push-to-talk, always-on, and similar modes |
 | `PushToTalkInput` | `string` | Input action name bound to push-to-talk |
 | `IsRecording` | `bool` | Whether it's currently recording (read-only) |
-| `Volume` | `float` | Playback volume |
+| `Volume` | `float` | How loud playback comes through |

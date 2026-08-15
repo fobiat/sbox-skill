@@ -34,6 +34,7 @@
 
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
@@ -183,6 +184,93 @@ public static class SboxDevTools
 		};
 	}
 
+	/// <summary>
+	/// Search the running engine for a type by name and report what it is. Ask this before
+	/// writing an API you are not certain about. The answer comes from the engine actually
+	/// loaded in the editor, not from documentation, so it cannot be stale and it cannot be
+	/// a plausible invention. No match is a real answer: the type does not exist, so do not
+	/// write it.
+	/// </summary>
+	[McpTool.ReadOnly( "project_find_type" )]
+	public static object ProjectFindType(
+		[Description( "Type name or fragment, case insensitive. For example \"SceneTrace\"." )] string name,
+		[Description( "Maximum results. Default 20." )] int limit = 20 )
+	{
+		if ( string.IsNullOrWhiteSpace( name ) )
+			throw new Exception( "Pass a type name or fragment to search for." );
+
+		var matches = AllTypes()
+			.Where( t => Contains( t.Name, name ) || Contains( t.FullName, name ) )
+			.OrderBy( t => t.Name?.Length ?? int.MaxValue )
+			.Take( Math.Max( 1, limit ) )
+			.Select( t => new
+			{
+				t.Name,
+				t.Namespace,
+				Kind = TypeKind( t ),
+				BaseType = t.BaseType?.Name,
+				Methods = t.Methods?.Length ?? 0,
+				Properties = t.Properties?.Length ?? 0,
+				t.Description,
+			} )
+			.ToArray();
+
+		return new
+		{
+			Count = matches.Length,
+			Types = matches,
+			Hint = matches.Length == 0
+				? $"Nothing matches \"{name}\" in the loaded engine. Treat that as proof it does not exist rather than as a search that needs rewording."
+				: "Call project_type_members for the full signature list of one of these.",
+		};
+	}
+
+	/// <summary>
+	/// List a type's methods and properties with real signatures, read from the running
+	/// engine. This is the ground truth an API reference is only an approximation of, so
+	/// prefer it whenever the two might disagree, and always for a type you are about to
+	/// call something unfamiliar on.
+	/// </summary>
+	[McpTool.ReadOnly( "project_type_members" )]
+	public static object ProjectTypeMembers(
+		[Description( "Exact type name, for example \"SceneTrace\"." )] string type,
+		[Description( "Only members whose name contains this. Optional." )] string filter = null,
+		[Description( "Maximum members of each kind. Default 60." )] int limit = 60 )
+	{
+		var target = AllTypes().FirstOrDefault( t => string.Equals( t.Name, type, StringComparison.OrdinalIgnoreCase ) )
+			?? throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
+
+		bool Wanted( string memberName ) => string.IsNullOrWhiteSpace( filter ) || Contains( memberName, filter );
+		var cap = Math.Max( 1, limit );
+
+		var methods = (target.Methods ?? Array.Empty<MethodDescription>())
+			.Where( m => !m.IsSpecialName && Wanted( m.Name ) )
+			.Take( cap )
+			.Select( m => new { m.Name, Signature = FormatMethod( m ), m.Description } )
+			.ToArray();
+
+		var properties = (target.Properties ?? Array.Empty<PropertyDescription>())
+			.Where( p => Wanted( p.Name ) )
+			.Take( cap )
+			.Select( p => new
+			{
+				p.Name,
+				Type = FriendlyName( p.PropertyType ),
+				Access = p.CanRead && p.CanWrite ? "get set" : p.CanRead ? "get" : "set",
+				p.Description,
+			} )
+			.ToArray();
+
+		return new
+		{
+			Type = target.FullName,
+			Kind = TypeKind( target ),
+			BaseType = target.BaseType?.FullName,
+			Methods = methods,
+			Properties = properties,
+		};
+	}
+
 	// ---------------------------------------------------------------- writing
 
 	/// <summary>
@@ -273,6 +361,51 @@ public static class SboxDevTools
 	static Project CurrentProject()
 	{
 		return Project.Current ?? throw new Exception( "No project is open in the editor." );
+	}
+
+	static bool Contains( string haystack, string needle )
+	{
+		return haystack?.Contains( needle, StringComparison.OrdinalIgnoreCase ) == true;
+	}
+
+	/// <summary>
+	/// The editor's type library rather than the game's, because the game one is only
+	/// populated while a scene is loaded and these tools have to answer at author time.
+	/// </summary>
+	static IEnumerable<TypeDescription> AllTypes()
+	{
+		var library = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary
+			?? throw new Exception( "EditorTypeLibrary is not available yet. Wait for the editor to finish loading." );
+
+		return library.GetTypes<object>() ?? Enumerable.Empty<TypeDescription>();
+	}
+
+	static string TypeKind( TypeDescription type )
+	{
+		if ( type.IsEnum ) return "enum";
+		if ( type.IsInterface ) return "interface";
+		if ( type.IsStatic ) return "static class";
+		if ( type.IsValueType ) return "struct";
+		if ( type.IsAbstract ) return "abstract class";
+		return "class";
+	}
+
+	static string FormatMethod( MethodDescription method )
+	{
+		var args = string.Join( ", ", method.Parameters.Select( p => $"{FriendlyName( p.ParameterType )} {p.Name}" ) );
+		return $"{FriendlyName( method.ReturnType )} {method.Name}( {args} )";
+	}
+
+	/// <summary>
+	/// Render a generic type the way a person writes it, so List`1 reads as List&lt;Entity&gt;.
+	/// </summary>
+	static string FriendlyName( Type type )
+	{
+		if ( type is null ) return "void";
+		if ( !type.IsGenericType ) return type.Name;
+
+		var args = string.Join( ", ", type.GetGenericArguments().Select( FriendlyName ) );
+		return $"{type.Name.Split( '`' )[0]}<{args}>";
 	}
 
 	static object ReadMember( object target, string name )
