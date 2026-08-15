@@ -13,6 +13,19 @@
 
 <br>
 
+> **In short.** Two things for building [s&box](https://sbox.game) games, either usable on its own.
+>
+> **The skill** is 16 reference files that teach a coding agent the real s&box API, so it stops
+> writing Unity code into your Source 2 project. Drop it in `.claude/skills/`, and it triggers
+> by itself on any s&box file. Every API in it is traceable to engine source at a named version.
+>
+> **The toolset** is one C# file for your `Editor/` folder that adds 11 tools to the editor's
+> MCP server. It answers the questions the editor otherwise leaves silent: does this type
+> actually exist, has the compiler noticed my edit, why did nothing happen when I changed that
+> config.
+
+<br>
+
 You write a component. It compiles. You press play. Nothing moves.
 
 There is no error. There is no warning. The console is clean. Somewhere between the code you
@@ -223,6 +236,10 @@ The first group inverts this project's own rule. Instead of "if it is in none of
 files it does not exist", you ask the running engine, and that answer cannot go out of date.
 
 Details in [`editor-mcp/README.md`](editor-mcp/README.md).
+
+> **Status:** every engine member the toolset reaches is verified present in 26.08.05 by file
+> and line, but it has not yet been compiled against a live editor. Report anything that does
+> not load and it gets fixed quickly.
 
 <br>
 
