@@ -1,18 +1,15 @@
 {
-  "Title": "sbox_mcp_server",
+  "Title": "s&box MCP Server",
   "Type": "library",
   "Org": "fobiat",
   "Ident": "sbox_mcp_server",
-  "Tags": "tool editor mcp development",
   "Schema": 1,
-  "HasAssets": false,
-  "AssetsPath": "",
+  "IncludeSourceFiles": false,
   "Resources": null,
-  "MenuResources": null,
-  "HasCode": true,
-  "CodePath": "",
   "PackageReferences": [],
   "EditorReferences": null,
+  "Mounts": null,
+  "IsStandaloneOnly": false,
   "Metadata": {
     "Compiler": {
       "TreatWarningsAsErrors": true

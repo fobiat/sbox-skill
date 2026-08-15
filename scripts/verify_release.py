@@ -133,6 +133,30 @@ def main():
     sbproj = json.loads((LIBRARY / "sbox_mcp_server.sbproj").read_text(encoding="utf-8"))
     check(sbproj["Type"] == "library", "sbproj is a library", sbproj["Type"])
     check(sbproj["Ident"] == "sbox_mcp_server", "sbproj ident", sbproj["Ident"])
+    check(sbproj["Org"] == "fobiat", "sbproj org", sbproj["Org"])
+
+    # Title is the display name on asset.party, so the ident is the wrong thing to see there
+    check(sbproj["Title"] != sbproj["Ident"], "sbproj title is a display name", sbproj["Title"])
+
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT,
+                             capture_output=True, text=True).stdout.split()
+    generated = [f for f in tracked
+                 if f.endswith((".slnx", ".editor.csproj"))
+                 or "/.sbox/" in f or "/.vscode/" in f
+                 or f.endswith("Properties/launchSettings.json")]
+    check(not generated, "no editor-generated file tracked", ", ".join(generated) or "none")
+
+    # the skill blob above is only part of the repo, and the paths leak from anywhere
+    leaked = []
+    for f in tracked:
+        if f == "scripts/verify_release.py":
+            continue
+        try:
+            body = (ROOT / f).read_text(encoding="utf-8").lower()
+        except (UnicodeDecodeError, OSError):
+            continue
+        leaked += [f"{f} ({leak.strip()})" for leak in LEAKS if leak.lower() in body]
+    check(not leaked, "no local path leaked repo-wide", ", ".join(leaked) or "none")
 
     # the library ships a copy, and a drifted copy is a silently wrong package
     check((LIBRARY / "Editor" / "SboxMcpServer.cs").read_bytes() == MCP.read_bytes(),

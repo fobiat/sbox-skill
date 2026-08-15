@@ -34,8 +34,12 @@ mix them up.
 A project's code splits by folder, not by preprocessor symbol. There is **no
 `#if EDITOR`** in s&box; that's a Unity habit and it doesn't apply here.
 
-- `Code/` (or whatever `CodePath` in the `.sbproj` points at) compiles to the main
-  game assembly. It's referenced by both the standalone game and the editor.
+- `Code/` compiles to the main game assembly, referenced by both the standalone game
+  and the editor. The folder is convention, not configuration: `CodePath` is a get-only
+  property alongside `GetCodePath()` and `HasCodePath()`, and the `.sbproj` carries no
+  `CodePath`, `HasCode` or `AssetsPath` field. Read from the shipped
+  `bin/managed/Sandbox.Engine.dll` metadata, build 2026-08-07, and confirmed against the
+  project file the editor writes for `templates/library.minimal`.
 - `Editor/` (checked with `Project.HasEditorPath()`, source
   `engine/Sandbox.Engine/Systems/Project/Project/Project.cs`) compiles to a **second,
   separate assembly** that only loads inside the editor process. It's built by

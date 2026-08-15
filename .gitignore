@@ -8,3 +8,11 @@ milestones.md
 raw/
 obj/
 bin/
+
+# s&box editor-generated, per-machine. Every one of these hardcodes an absolute
+# Steam install path or a home directory, and the editor rewrites them on open.
+.sbox/
+.vscode/
+*.slnx
+*.editor.csproj
+**/Properties/launchSettings.json

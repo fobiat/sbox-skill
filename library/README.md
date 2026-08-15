@@ -39,7 +39,19 @@ library/
   sbox_mcp_server.sbproj   Type: library, Org: fobiat, Ident: sbox_mcp_server
   Editor/
     SboxMcpServer.cs       byte-identical copy of editor-mcp/SboxMcpServer.cs
+  ProjectSettings/         Collision, Input and Platform defaults the editor writes
 ```
+
+Opening the project in the editor also writes `.sbox/`, `.vscode/`, `*.slnx`,
+`Editor/*.editor.csproj` and `Editor/Properties/launchSettings.json`. Every one of those
+hardcodes an absolute Steam install path or a home directory, so all five are gitignored and
+`scripts/verify_release.py` fails if one ever gets tracked.
+
+The editor also rewrites the `.sbproj` on first open, dropping `Tags`, `HasAssets`,
+`AssetsPath`, `MenuResources`, `HasCode` and `CodePath`, and adding `IncludeSourceFiles`,
+`Mounts` and `IsStandaloneOnly`. That is a schema migration, not damage: the result has the
+same shape as Facepunch's own shipped `editor/DooEditor/DooEditor.sbproj`. Tags now live on the
+asset.party page rather than in the project file.
 
 `editor-mcp/SboxMcpServer.cs` stays canonical. A library cannot reference a source file outside
 its own project root, so this is a copy rather than a link, kept honest by two things: run
@@ -51,10 +63,16 @@ its own project root, so this is a copy rather than a link, kept honest by two t
 1. Add this directory as a project in the s&box editor. It should appear under Libraries.
 2. Check the toolset still registers: `list_toolsets` should show `sbox_mcp_server` with eleven
    tools.
-3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_mcp_server`.
-4. In a consumer, add `fobiat.sbox_mcp_server` to package references and restart the editor.
+3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_mcp_server`. The
+   listing takes its display name from `Title`, so it reads **s&box MCP Server**; the
+   description, tags and thumbnail are filled in on the site, not in the project file.
+4. In a **separate game or addon project**, add `fobiat.sbox_mcp_server` to package references,
+   restart the editor, and run `list_toolsets` again.
 
-Step 2 matters. If the tools do not appear when the library is loaded from a package rather
-than from a local `Editor/` folder, the file-drop install in
-[`editor-mcp/README.md`](../editor-mcp/README.md) is still the supported path and nothing is
-lost.
+Step 4 is the one that decides this. Loading from a package is a different path from loading a
+local `Editor/` folder, and only step 4 exercises it. If the tools do not appear there, the
+file-drop install in [`editor-mcp/README.md`](../editor-mcp/README.md) is still the supported
+path and nothing is lost.
+
+A library consuming this library will not get the editor code either way, per the reference
+loop gate described above.

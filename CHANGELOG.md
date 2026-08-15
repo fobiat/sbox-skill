@@ -3,6 +3,32 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+Preparing the library for its first asset.party publish. **Nothing in the skill or the toolset
+changed**, so no reinstall is needed.
+
+### Changed
+- `library/sbox_mcp_server.sbproj` is the schema the current editor writes: `Tags`, `HasAssets`,
+  `AssetsPath`, `MenuResources`, `HasCode` and `CodePath` are gone, `IncludeSourceFiles`,
+  `Mounts` and `IsStandaloneOnly` are new. Same shape as Facepunch's own shipped
+  `editor/DooEditor/DooEditor.sbproj`. Tags now belong on the asset.party page.
+- `Title` is now `s&box MCP Server` rather than the ident, since it is the display name on
+  asset.party. `Ident` is untouched, so a package reference is still `fobiat.sbox_mcp_server`.
+- `skills/sbox/references/06_EDITOR.md` no longer says `Code/` is set by a `CodePath` field in
+  the `.sbproj`. `CodePath` is a get-only property and that field does not exist. Read from
+  `bin/managed/Sandbox.Engine.dll` metadata, build 2026-08-07.
+
+### Added
+- `library/ProjectSettings/`, the Collision, Input and Platform defaults the editor writes.
+- Gitignore rules for the five per-machine files the editor generates on open (`.sbox/`,
+  `.vscode/`, `*.slnx`, `*.editor.csproj`, `Properties/launchSettings.json`). Each hardcodes an
+  absolute Steam install path or a home directory.
+- `scripts/verify_release.py` now scans every tracked file for local-path leakage rather than
+  the skill alone, fails if an editor-generated file is tracked, and checks the sbproj `Org` and
+  that `Title` is not just the ident. The old skill-only scan would not have caught
+  `launchSettings.json`, which carried a full home directory path.
+
 ## [0.3.0] - 2026-08-15
 
 Renames the editor toolset. **This is a breaking change**: any agent or saved workflow that
