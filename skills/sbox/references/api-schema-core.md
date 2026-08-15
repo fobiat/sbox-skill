@@ -1,8 +1,10 @@
-# API Schema — Core Classes
+# API Schema: Core Classes
 
-Full public signatures for the ~50 most-used classes. Lookup reference — see topical reference files for usage patterns.
+Full public signatures for the ~50 most-used classes in the s&box engine, extracted from the managed API surface at version 26.08.05. This is a lookup reference, not a tutorial: check it when you need to confirm a method exists, its exact name, its parameter list, or its return type. For usage patterns and worked examples, see the topical reference files instead.
 
-All types are in `Sandbox` namespace unless noted. Types with no namespace prefix are global.
+The extraction excludes operators. Signature lines are mechanical and exact; the surrounding prose is not part of the API and can be wrong, but the signatures themselves should not be.
+
+All types are in the `Sandbox` namespace unless noted. Types with no namespace prefix are global.
 
 ---
 
@@ -61,7 +63,7 @@ BBox GetLocalBounds()
 IEnumerable<GameObject> GetAllObjects( bool enabledOnly )
 GameObject GetNextSibling( bool enabledOnly )
 void RunEvent<T>( Action<T> action, FindMode find )
-// Cloning (11 overloads — most common)
+// Cloning (11 overloads, most common)
 GameObject Clone( Vector3 position )
 GameObject Clone( Vector3 position, Rotation rotation )
 GameObject Clone( Transform transform )
@@ -203,7 +205,7 @@ Vector3( float all )
 
 // Static fields
 Vector3 Zero, One, Forward, Backward, Up, Down, Left, Right
-// Forward = (1,0,0)  Right = (0,-1,0)  Up = (0,0,1)  — Z-up coordinate system
+// Forward = (1,0,0)  Right = (0,-1,0)  Up = (0,0,1)  (Z-up coordinate system)
 
 // Static property
 Vector3 Random
@@ -525,7 +527,7 @@ string GetBoneName( int boneIndex )
 Transform GetBoneTransform( int boneIndex )
 ```
 
-**`Model.Load` can return null — always null-check it.** Two different failure results
+**`Model.Load` can return null: always null-check it.** Two different failure results
 (`Resources/Model/Model.Load.cs:12-28`):
 
 - Null / empty / whitespace path → returns `Model.Error`, the visible pink-checker
@@ -551,14 +553,14 @@ if ( model is null )
 
 ## GameResource & `[AssetType]`
 
-A `GameResource` is a data asset defined in C# and authored as JSON on disk — the s&box
+A `GameResource` is a data asset defined in C# and authored as JSON on disk: the s&box
 answer to a Unity `ScriptableObject`. Item definitions, ammo types, vehicle stats,
 loot tables.
 
 ### Declaring the type
 
 **`[GameResource( title, extension, description )]` is obsolete engine-wide**
-(`Resources/GameResourceAttribute.cs:82` — `[Obsolete( "Use AssetType instead" )]`). Under
+(`Resources/GameResourceAttribute.cs:82`, `[Obsolete( "Use AssetType instead" )]`). Under
 `TreatWarningsAsErrors` it is a hard build failure. Use `[AssetType]` with **property
 initializers**, not constructor arguments:
 
@@ -583,7 +585,7 @@ public sealed class ItemDefinition : GameResource
 | `IconColor` | `string` | Thumbnail accent, default `"#67ac5c"` |
 | `static FindTypeByExtension( string )` | `TypeDescription` | Reverse lookup |
 
-The base class is unchanged — you still derive from `GameResource`, and
+The base class is unchanged: you still derive from `GameResource`, and
 `PostLoad()` / `StateHasChanged()` still work. The engine's own
 `BaseAmmoResource` is the live reference implementation:
 `[AssetType( Name = "Ammo Type", Extension = "ammo", Category = "Game" )]`
@@ -604,8 +606,8 @@ Real engine asset (`game/addons/base/Assets/ammo/9mm.ammo`):
 }
 ```
 
-- `__references` — assets this one depends on. Leave `[]`; the editor maintains it.
-- `__version` — resource version, for your own migration logic.
+- `__references`: assets this one depends on. Leave `[]`; the editor maintains it.
+- `__version`: resource version, for your own migration logic.
 - A `Model` / `Material` / `SoundEvent` / other resource-typed `[Property]` serialises as
   its **path string**: `"WorldModel": "models/citizen_props/crate01.vmdl"`.
 
@@ -623,16 +625,16 @@ static bool    ResourceLibrary.TryGet<T>( string filepath, out T resource )    /
 static IEnumerable<T> ResourceLibrary.GetAll<T>()                              // :573
 static IEnumerable<T> ResourceLibrary.GetAll<T>( string filepath, bool recursive = true )  // :581
 static Task<T> ResourceLibrary.LoadAsync<T>( string path )                     // :586
-static T       ResourceLibrary.Get<T>( int identifier )     // [Obsolete] — :551
+static T       ResourceLibrary.Get<T>( int identifier )     // [Obsolete] :551
 ```
 
 (Line numbers in `Resources/ResourceLibrary.cs`.) `GetAll<T>()` is how you build a
-registry at startup — every compiled resource of that type is already registered.
+registry at startup; every compiled resource of that type is already registered.
 
 `ResourceLibrary.IEventListener` gives you `OnRegister` / `OnUnregister` / `OnSave` /
 `OnExternalChanges` / `OnExternalChangesPostLoad` for editor-time hot-reload.
 
-### Identity — persist the path, not the id
+### Identity: persist the path, not the id
 
 On `Resource` (`Resources/Resource.cs`):
 
@@ -640,7 +642,7 @@ On `Resource` (`Resources/Resource.cs`):
 |---|---|
 | `string ResourcePath` | The canonical identifier. **Persist this.** (`:26`) |
 | `string ResourceName` | Filename without extension (`:32`) |
-| `int ResourceId` | **`[Obsolete]`** — a 32-bit hash of the path (`:16-17`) |
+| `int ResourceId` | **`[Obsolete]`**, a 32-bit hash of the path (`:16-17`) |
 
 Over the network a resource reference costs 8 bytes: `Resource` implements
 `BytePack.ISerializer` and writes only its 64-bit path hash
@@ -786,7 +788,7 @@ string[] Tags
 ## Collision & DamageInfo
 
 ```
-// Collision (struct — passed to ICollisionListener)
+// Collision (struct, passed to ICollisionListener)
 CollisionSource Self, Other
 PhysicsContact Contact
 
@@ -799,7 +801,7 @@ bool IsTrigger
 Vector3 Point, Speed, Normal
 float NormalSpeed, Impulse
 
-// CollisionStop (struct — passed to OnCollisionStop)
+// CollisionStop (struct, passed to OnCollisionStop)
 CollisionSource Self, Other
 
 // DamageInfo (class)
@@ -821,7 +823,7 @@ DamageInfo( float damage, GameObject attacker, GameObject weapon, Hitbox hitbox 
 ## Tags (ITagSet / GameTags / TagSet)
 
 ```
-// ITagSet (abstract base — used by Component.Tags)
+// ITagSet (abstract base, used by Component.Tags)
 bool Has( string tag )
 void Add( string tag )
 void Remove( string tag )
@@ -832,10 +834,10 @@ bool HasAny( params string[] tags )
 bool HasAll( params string[] tags )
 IEnumerable<string> TryGetAll()
 
-// GameTags (on GameObject.Tags — includes ancestor inheritance)
+// GameTags (on GameObject.Tags, includes ancestor inheritance)
 bool Has( string tag, bool includeAncestors )
 
-// TagSet (standalone — e.g. DamageInfo.Tags)
+// TagSet (standalone, e.g. DamageInfo.Tags)
 TagSet()
 TagSet( IEnumerable<string> tags )
 bool IsEmpty
@@ -1026,7 +1028,7 @@ IEnumerable<GameObject> FindByName( string name, bool caseinsensitive = true )
 ## Key Enums
 
 ```
-// FindMode (flags — combine with |)
+// FindMode (flags, combine with |)
 Enabled, Disabled
 InSelf, InParent, InAncestors, InChildren, InDescendants
 // Common combos: EnabledInSelfAndDescendants, EverythingInSelfAndChildren

@@ -1,96 +1,109 @@
 ---
 name: sbox
-description: Use when writing or modifying code for s&box, sbox, the Facepunch sandbox engine, or any Source 2 game project in C#. Triggers on mentions of s&box, sbox, sandbox game, Facepunch engine, Source 2 game, `.sbproj`, `.razor` with `PanelComponent`, `@inherits PanelComponent`, `Sandbox.Component`, `GameObject` + `Components.Get<T>`, `Scene.Trace`, `CharacterController` + `.Move()`, `SkinnedModelRenderer`, `NavMeshAgent`, `[Sync]`, `[Rpc.Broadcast]`, `[Property]`, `INetworkListener`, `ISceneEvent`, `PlayerController` in C#. Also triggers on any file with `using Sandbox;` or `using Sandbox.UI;` that isn't Unity/Godot/Unreal. Writes idiomatic s&box C# components, Razor UI, and networking code; prevents Unity-pattern leakage.
+description: Use when writing or modifying code for s&box, sbox, the Facepunch sandbox engine, or any Source 2 game project in C#. Triggers on mentions of s&box, sbox, sandbox game, Facepunch engine, Source 2 game, `.sbproj`, `.razor` with `PanelComponent`, `@inherits PanelComponent`, `Sandbox.Component`, `GameObject` + `Components.Get<T>`, `Scene.Trace`, `CharacterController` + `.Move()`, `SkinnedModelRenderer`, `NavMeshAgent`, `[Sync]`, `[Rpc.Broadcast]`, `[Property]`, `[AssetType]`, `INetworkListener`, `ISceneEvent`, `PlayerController`, `ClothingContainer`, `EditorTool`, `Mixer`, `.shader` files in a Source 2 project. Also triggers on any file with `using Sandbox;` or `using Sandbox.UI;` that is not Unity, Godot or Unreal. Covers gameplay components, Razor UI, networking, editor extensions, avatars, shaders, audio, services and persistence. Prevents Unity-pattern leakage.
 ---
 
-# s&box Skill — Router
+# s&box: Router
 
-## READ BEFORE WRITING CODE
+## Read this before writing code
 
-**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast` — **none of these exist**. If you write any of them you have hallucinated.
+**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast`: none of these exist. If you have written one, you have hallucinated it.
 
-s&box is a C# scripting layer on Source 2 by Facepunch. The scene system uses `GameObject` + `Component` with a different lifecycle, a different networking model, and a different API surface. The API schema in `references/api-schema-core.md` is ground truth; if anything in this skill contradicts the schema, the schema wins.
+s&box is a C# scripting layer on Source 2, built by Facepunch. It borrows the `GameObject` plus `Component` shape from Unity and almost nothing else. The lifecycle is different, the networking model is different, the coordinate system is different, and most of the API surface is named differently.
 
-**Before you write a single line of s&box code, open the relevant reference file.** SKILL.md is a router — it points you at the answer, it does not contain the answer. Writing a component? Open `references/core-concepts.md`. Writing UI? Open `references/ui-razor.md`. No exceptions for "simple" tasks — your muscle memory is wrong.
+That surface similarity is the whole problem. Unity muscle memory produces code that looks right, reads right, and does not compile.
+
+**Open the relevant reference file before you write a single line.** This file is a router. It tells you where the answer is; it does not contain the answer. Writing a component? Open `references/core-concepts.md`. Writing UI? Open `references/ui-razor.md`. There is no exception for a task that feels simple, because the tasks that feel simple are the ones muscle memory ruins.
+
+The API schema is ground truth. Where this file and the schema disagree, the schema wins.
 
 ---
 
-## Architecture in 30 Seconds
+## The architecture in thirty seconds
 
 ```
-Scene (is-a GameObject — the root)
+Scene (is-a GameObject, the root)
   └── GameObject (transform, tags, children, components)
         └── Component (all gameplay code extends this)
 ```
 
 - **All gameplay code** is a `sealed class` extending `Sandbox.Component`.
-- **Lifecycle overrides** are `protected override void OnAwake() / OnStart() / OnUpdate() / OnFixedUpdate() / OnEnabled() / OnDisabled() / OnDestroy()`. Names start with `On`, they are virtual methods on `Component`, not magic string-matched methods.
-- **Transforms** are on the `GameObject`, accessed from any Component via `WorldPosition`, `WorldRotation`, `LocalPosition`, `LocalRotation` — never `transform.position`.
-- **UI** is Razor (`.razor` files) — HTML + SCSS + C#. Panels use flexbox layout. Hot-reloads in the editor.
-- **Networking** is owner-authoritative. Mark state with `[Sync]`, mark methods with `[Rpc.Broadcast / Host / Owner]`. Skip simulation on non-owners with `if ( IsProxy ) return;`.
-- **Physics** uses `Rigidbody` + `Collider` components. Raycasts are `Scene.Trace.Ray(from, to).Run()` — a builder-pattern API. Collisions come through `Component.ICollisionListener` and `Component.ITriggerListener` interfaces.
-- **Coordinate system** is **Z-up**: `Vector3.Forward = (1,0,0)`, `Vector3.Right = (0,-1,0)`, `Vector3.Up = (0,0,1)`.
-- **Restricted .NET:** `System.IO.File`, raw sockets, `Console`, `Thread`, `Process` — all blocked. Use `FileSystem.Data`, `Http`, `Log`, `async/await`.
+- **Lifecycle overrides** are `protected override void OnAwake() / OnStart() / OnUpdate() / OnFixedUpdate() / OnEnabled() / OnDisabled() / OnDestroy()`. They are virtual methods on `Component`, not magic methods matched by name, and they all start with `On`.
+- **Transforms live on the GameObject**, reachable from any Component as `WorldPosition`, `WorldRotation`, `LocalPosition`, `LocalRotation`. There is no `transform`.
+- **Game UI is Razor**: `.razor` files holding HTML, SCSS and C#, laid out with flexbox, hot-reloaded in the editor. **Editor UI is not Razor.** It is a separate Qt-backed `Widget` system, and confusing the two is a common and expensive mistake. See `references/editor-tooling.md`.
+- **Networking is owner-authoritative.** Mark state `[Sync]`, mark methods `[Rpc.Broadcast / Host / Owner]`, and skip simulation on non-owners with `if ( IsProxy ) return;`.
+- **Physics** is `Rigidbody` plus `Collider` components. Traces are a builder: `Scene.Trace.Ray( from, to ).Run()`. Collisions arrive through `Component.ICollisionListener` and `Component.ITriggerListener`.
+- **The coordinate system is Z-up.** `Vector3.Forward = (1,0,0)`, `Vector3.Right = (0,-1,0)`, `Vector3.Up = (0,0,1)`. Re-check every literal direction you write.
+- **.NET is restricted.** `System.IO.File`, raw sockets, `Console`, `Thread` and `Process` are blocked at compile time. Use `FileSystem.Data`, `Http`, `Log` and `async/await`.
 
 ---
 
-## Routing Table — "I need to…"
+## Routing table
 
-Match the task, open the file. Do not guess; open the file.
+Match the task, open the file. Do not guess, open the file.
 
 | Task | Read |
 |---|---|
-| Understand the scene/GameObject/Component model | `references/core-concepts.md` |
-| Write a `Component` (lifecycle, `[Property]`, Tags, async) | `references/core-concepts.md` |
-| Spawn / clone / destroy a prefab | `references/core-concepts.md` → *Prefabs* |
-| Fire a scene event (`ISceneEvent<T>`) | `references/core-concepts.md` → *Scene Events* |
-| Write a `GameObjectSystem` | `references/core-concepts.md` → *GameObjectSystem* |
-| Use `ModelRenderer` / `SkinnedModelRenderer` / bones / animgraph | `references/components-builtin.md` → *Rendering* |
-| Use `Rigidbody`, any `Collider`, joints | `references/components-builtin.md` → *Physics* |
-| Use `CharacterController` for movement | `references/components-builtin.md` → *CharacterController* |
-| Use the full `PlayerController` (built-in FPS/TPS) | `references/components-builtin.md` → *Gameplay* |
-| Make something usable — "walk up and press E" (`IPressable`) | `references/core-concepts.md` → *IPressable*, then `references/patterns-and-examples.md` → *Example 11* |
-| Use `Prop`, or decide whether to compose renderer+collider+rigidbody yourself | `references/components-builtin.md` → *Prop* |
-| Use the built-in inventory (`BaseInventoryComponent` / `BaseInventoryItem`) | `references/components-builtin.md` → *Inventory* |
-| Set up a camera, HUD painter, post-processing | `references/components-builtin.md` → *Camera*, *Post-Processing* |
-| Use lights, fog, envmap probes, skybox | `references/components-builtin.md` → *Lighting*, *Environment* |
-| Add audio (`SoundPointComponent`, `Sound.Play`) | `references/components-builtin.md` → *Audio* |
-| Use `NavMeshAgent`, `NavMeshLink`, query NavMesh | `references/components-builtin.md` → *Navigation* |
-| Create particles, decals, trails, beams | `references/components-builtin.md` → *Effects*, *Rendering* |
-| Write a Razor UI panel (`.razor`, `PanelComponent`, `BuildHash`) | `references/ui-razor.md` |
-| Style with SCSS — flexbox, transitions, `:intro` / `:outro`, `:bind` | `references/ui-razor.md` → *Styling*, *Layout System*, *Transitions* |
-| Use built-in controls (`Button`, `TextEntry`, `DropDown`, `VirtualList`) | `references/ui-razor.md` → *Built-in Controls* |
-| Build a world-space panel or a NavigationHost app | `references/ui-razor.md` → *WorldPanel*, *Navigation* |
-| Set up a lobby, connect/disconnect, query `Connection` | `references/networking.md` → *Lobby & Connection* |
-| Network an object (`NetworkMode`, `NetworkSpawn`, ownership) | `references/networking.md` → *Networked Objects*, *Ownership* |
-| Use `[Sync]` / `[Sync(SyncFlags.X)]` / `[Change]` / `NetList` / `NetDictionary` | `references/networking.md` → *[Sync] Properties* |
-| Write RPCs (`[Rpc.Broadcast/Host/Owner]`, `NetFlags`, caller info, filtering) | `references/networking.md` → *RPC Messages* |
-| React to connections (`INetworkListener`, `INetworkSpawn`, snapshot data) | `references/networking.md` → *Network Events* |
-| Use `ISceneStartup` for host vs client initialization | `references/networking.md` → *Scene Startup* |
-| Dedicated server / `#if SERVER` / user permissions | `references/networking.md` → *Dedicated Servers* |
-| Poll keyboard/mouse/controller input, haptics, glyphs | `references/input-and-physics.md` → *Input* |
-| Raycast / sphere / box / capsule trace with tag filters | `references/input-and-physics.md` → *SceneTrace* |
-| Access `PhysicsWorld`, gravity, physics events | `references/input-and-physics.md` → *Physics World* |
-| Implement collision/trigger listeners | `references/input-and-physics.md` → *Collision System* |
-| Use `Vector3` / `Rotation` / `Angles` / `Transform` / `BBox` / `Ray` / `Capsule` | `references/input-and-physics.md` → *Math Types* |
-| Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/input-and-physics.md` → *Time* |
-| Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/input-and-physics.md` → *Gizmo* |
-| Declare/author a custom data asset (`GameResource` + `[AssetType]`, `.item` JSON) | `references/api-schema-core.md` → *GameResource & `[AssetType]`* |
-| Load a `Model` / `Material` / resource by path safely | `references/api-schema-core.md` → *Model*, *GameResource & `[AssetType]`* |
-| Edit `Input.config` / `Platform.config`, or kill the built-in platform chat | `references/input-and-physics.md` → *Project Settings Configs*, *Platform Chat* |
-| Drive the editor over MCP (assets, scene, compile, play mode) | `references/editor-and-verified-behaviour.md` → *The Editor MCP Server* |
-| Find out what has actually been proven in a live editor session | `references/editor-and-verified-behaviour.md` → *Verified Networking Behaviour* |
-| Need the full signature of `GameObject`, `Component`, `Scene`, `Input`, etc. | `references/api-schema-core.md` |
-| Look up whether a given type exists & what it does | `references/api-schema-extended.md` |
-| See a complete worked example of a pattern before writing your own | `references/patterns-and-examples.md` |
+| Understand the Scene, GameObject and Component model | `references/core-concepts.md` |
+| Write a `Component` (lifecycle, `[Property]`, tags, async) | `references/core-concepts.md` |
+| Spawn, clone or destroy a prefab | `references/core-concepts.md`, *Prefabs* |
+| Fire a scene event (`ISceneEvent<T>`) | `references/core-concepts.md`, *Scene Events* |
+| Write a `GameObjectSystem` | `references/core-concepts.md`, *GameObjectSystem* |
+| Make something usable, walk up and press E (`IPressable`) | `references/core-concepts.md`, *IPressable*, then `references/patterns-and-examples.md` |
+| Declare a custom data asset (`GameResource` + `[AssetType]`) | `references/api-schema-core.md`, *GameResource* |
+| Use `ModelRenderer`, `SkinnedModelRenderer`, bones, animgraph | `references/components-builtin.md`, *Rendering* |
+| Use `Rigidbody`, colliders, joints | `references/components-builtin.md`, *Physics* |
+| Move something with `CharacterController` | `references/components-builtin.md`, *CharacterController* |
+| Use the built-in `PlayerController` | `references/components-builtin.md`, *Gameplay* |
+| Use `Prop`, or compose renderer + collider + rigidbody yourself | `references/components-builtin.md`, *Prop* |
+| Use the built-in inventory components | `references/components-builtin.md`, *Inventory* |
+| Set up a camera, HUD painter or post-processing | `references/components-builtin.md`, *Camera* |
+| Use lights, fog, envmap probes, skybox | `references/components-builtin.md`, *Lighting* |
+| Use `NavMeshAgent`, `NavMeshLink`, query the NavMesh | `references/components-builtin.md`, *Navigation* |
+| Create particles, decals, trails, beams | `references/components-builtin.md`, *Effects* |
+| Write a Razor panel (`.razor`, `PanelComponent`, `BuildHash`) | `references/ui-razor.md` |
+| Style with SCSS, flexbox, `:intro` / `:outro`, `:bind` | `references/ui-razor.md`, *Styling* |
+| Use built-in controls (`Button`, `TextEntry`, `DropDown`, `VirtualList`) | `references/ui-razor.md`, *Built-in Controls* |
+| Build a world-space panel or a NavigationHost app | `references/ui-razor.md`, *WorldPanel* |
+| Set up a lobby, connect, disconnect, query `Connection` | `references/networking.md`, *Lobby & Connection* |
+| Network an object (`NetworkMode`, `NetworkSpawn`, ownership) | `references/networking.md`, *Networked Objects* |
+| Use `[Sync]`, `[Change]`, `NetList`, `NetDictionary` | `references/networking.md`, *Sync Properties* |
+| Write RPCs (`[Rpc.Broadcast/Host/Owner]`, `NetFlags`, filtering) | `references/networking.md`, *RPC Messages* |
+| React to connections (`INetworkListener`, `INetworkSpawn`) | `references/networking.md`, *Network Events* |
+| Split host and client startup (`ISceneStartup`) | `references/networking.md`, *Scene Startup* |
+| Run a dedicated server, `#if SERVER`, permissions | `references/networking.md`, *Dedicated Servers* |
+| Poll keyboard, mouse, controller, haptics, glyphs | `references/input-and-physics.md`, *Input* |
+| Trace a ray, sphere, box or capsule with tag filters | `references/input-and-physics.md`, *SceneTrace* |
+| Reach `PhysicsWorld`, gravity, physics events | `references/input-and-physics.md`, *Physics World* |
+| Implement collision and trigger listeners | `references/input-and-physics.md`, *Collision System* |
+| Use `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox`, `Ray` | `references/input-and-physics.md`, *Math Types* |
+| Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/input-and-physics.md`, *Time* |
+| Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/input-and-physics.md`, *Gizmo* |
+| Write an editor tool, custom inspector or dock | `references/editor-tooling.md` |
+| Build editor UI with `Widget` and `Layout` (not Razor) | `references/editor-tooling.md`, *Widget system* |
+| Record stats, read or submit leaderboards, unlock achievements | `references/services-and-persistence.md` |
+| Save and load player or game data | `references/services-and-persistence.md`, *Persistence* |
+| Query, mount or read a `Package` | `references/services-and-persistence.md`, *Package* |
+| Dress a player, use `Clothing` or `ClothingContainer` | `references/avatar-and-clothing.md` |
+| Find the Citizen model, body groups or material groups | `references/avatar-and-clothing.md` |
+| Write a `.shader`, or set material and render attributes | `references/shaders-and-rendering.md` |
+| Work with render layers, custom render objects, `CommandList` | `references/shaders-and-rendering.md` |
+| Route sound through the mixer graph, control a `SoundHandle` | `references/audio-and-localization.md` |
+| Localize text, use `Phrase` or `#` tokens | `references/audio-and-localization.md`, *Localization* |
+| Edit `Input.config` or `Platform.config`, kill the platform chat | `references/input-and-physics.md`, *Project Settings Configs* |
+| Drive the editor over MCP (assets, scene, compile, play mode) | `references/editor-and-verified-behaviour.md`, *Editor MCP Server* |
+| Find out what has actually been proven in a live session | `references/editor-and-verified-behaviour.md`, *Verified Behaviour* |
+| Get the full signature of `GameObject`, `Component`, `Scene`, `Input` | `references/api-schema-core.md` |
+| Check whether a type exists at all | `references/api-schema-extended.md` |
+| See a complete worked example before writing your own | `references/patterns-and-examples.md` |
 
 ---
 
-## Unity → s&box Translation Table
+## Unity to s&box
 
-Any time you write one of the left column, you are hallucinating. Use the right column.
+Any time you write the left column, you are hallucinating. Use the right.
 
-| Unity / Wrong | s&box / Correct |
+| Unity, wrong | s&box, correct |
 |---|---|
 | `class Foo : MonoBehaviour` | `public sealed class Foo : Component` |
 | `void Awake()` | `protected override void OnAwake()` |
@@ -101,108 +114,106 @@ Any time you write one of the left column, you are hallucinating. Use the right 
 | `void OnDestroy()` | `protected override void OnDestroy()` |
 | `[SerializeField] float speed` | `[Property] public float Speed { get; set; }` |
 | `[HideInInspector]` | `[Hide]` |
-| `transform.position` | `WorldPosition` (or `GameObject.WorldPosition`) |
+| `transform.position` | `WorldPosition` |
 | `transform.localPosition` | `LocalPosition` |
 | `transform.rotation` | `WorldRotation` |
 | `transform.forward` | `WorldRotation.Forward` |
 | `gameObject.SetActive(false)` | `GameObject.Enabled = false` |
-| `Destroy(gameObject)` / `Destroy(this)` | `GameObject.Destroy()` / `Component.Destroy()` / `DestroyGameObject()` |
+| `Destroy(gameObject)` | `GameObject.Destroy()` / `Component.Destroy()` / `DestroyGameObject()` |
 | `Instantiate(prefab, pos, rot)` | `prefab.Clone( pos, rot )` |
 | `Instantiate(prefab); NetworkServer.Spawn(...)` | `prefab.Clone(pos).NetworkSpawn( owner )` |
-| `GetComponent<T>()` in `Start/Update` | `GetComponent<T>()` is fine; also `Components.Get<T>( FindMode )` for ancestor/descendant searches |
-| `FindObjectOfType<T>()` / `FindObjectsOfType<T>()` | `Scene.Get<T>()` / `Scene.GetAll<T>()` / `Scene.GetAllComponents<T>()` |
+| `GetComponent<T>()` in `Start`/`Update` | `GetComponent<T>()` works; use `Components.Get<T>( FindMode )` for ancestor or descendant searches |
+| `FindObjectOfType<T>()` | `Scene.Get<T>()` / `Scene.GetAll<T>()` / `Scene.GetAllComponents<T>()` |
 | `GameObject.Find("Name")` | `Scene.Directory.FindByName("Name")` |
-| `OnCollisionEnter(Collision c)` | Implement `Component.ICollisionListener.OnCollisionStart(Collision c)` |
-| `OnTriggerEnter(Collider c)` | Implement `Component.ITriggerListener.OnTriggerEnter(Collider c)` |
-| `Physics.Raycast(...)` | `Scene.Trace.Ray( from, to ).Run()` (builder; returns `SceneTraceResult`) |
+| `OnCollisionEnter(Collision c)` | `Component.ICollisionListener.OnCollisionStart(Collision c)` |
+| `OnTriggerEnter(Collider c)` | `Component.ITriggerListener.OnTriggerEnter(Collider c)` |
+| `Physics.Raycast(...)` | `Scene.Trace.Ray( from, to ).Run()`, returns `SceneTraceResult` |
 | `Physics.OverlapSphere(pos, r)` | `Scene.Trace.Sphere( r, pos, pos ).RunAll()` |
 | `Rigidbody.AddForce(f, ForceMode.Impulse)` | `Rigidbody.ApplyImpulse( f )` |
 | `Rigidbody.AddForce(f)` | `Rigidbody.ApplyForce( f )` |
-| `Rigidbody.velocity` | `Rigidbody.Velocity` (capital V) |
-| `Input.GetKey(KeyCode.W)` | `Input.Down( "forward" )` — actions are strings configured in Project Settings |
+| `Rigidbody.velocity` | `Rigidbody.Velocity` |
+| `Input.GetKey(KeyCode.W)` | `Input.Down( "forward" )`, actions are strings set in Project Settings |
 | `Input.GetKeyDown(...)` | `Input.Pressed( "action" )` |
-| `Input.GetAxis("Horizontal")` / `Vertical` | `Input.AnalogMove` (`Vector3`) |
-| `Input.mousePosition` | `Mouse.Position` (`Vector2`) |
+| `Input.GetAxis("Horizontal")` | `Input.AnalogMove`, a `Vector3` |
+| `Input.mousePosition` | `Mouse.Position`, a `Vector2` |
 | `Camera.main` | `Scene.Camera` |
-| `Camera.main.ScreenPointToRay(Input.mousePosition)` | `Scene.Camera.ScreenPixelToRay( Mouse.Position )` |
-| `StartCoroutine(Foo())` with `IEnumerator` | `async Task Foo()` with `await Task.DelaySeconds(...)`; call as `_ = Foo();` |
+| `Camera.main.ScreenPointToRay(...)` | `Scene.Camera.ScreenPixelToRay( Mouse.Position )` |
+| `StartCoroutine(Foo())` | `async Task Foo()`, called as `_ = Foo();` |
 | `yield return new WaitForSeconds(1f)` | `await Task.DelaySeconds( 1f )` |
 | `yield return null` | `await Task.Frame()` |
-| `Debug.Log(x)` / `.LogWarning` / `.LogError` | `Log.Info(x)` / `Log.Warning(x)` / `Log.Error(x)` |
+| `Debug.Log(x)` | `Log.Info(x)` / `Log.Warning(x)` / `Log.Error(x)` |
 | `Time.time` | `Time.Now` |
 | `Time.deltaTime` | `Time.Delta` |
 | `Time.fixedDeltaTime` | `Scene.FixedDelta` |
 | `Mathf.Lerp / Clamp / Approach` | `MathX.Lerp / Clamp / Approach` |
 | `Random.Range(a, b)` | `Game.Random.Next(a, b)` / `Game.Random.NextSingle()` |
-| `Vector3.forward = (0,0,1)` | `Vector3.Forward = (1,0,0)` — **s&box is Z-up**; re-check every literal direction |
-| `SceneManager.LoadScene("name")` | `Scene.LoadFromFile("path/to/scene.scene")` or `Scene.Load( sceneResource )` |
+| `Vector3.forward = (0,0,1)` | `Vector3.Forward = (1,0,0)`, s&box is Z-up |
+| `SceneManager.LoadScene("name")` | `Scene.LoadFromFile("path/to/scene.scene")` |
 | `DontDestroyOnLoad(go)` | `go.Flags = GameObjectFlags.DontDestroyOnLoad` |
 | `class Foo : ScriptableObject` + `[CreateAssetMenu]` | `[AssetType( Name = ..., Extension = ..., Category = ... )] class Foo : GameResource` |
-| `Resources.Load<T>("path")` / `Resources.FindObjectsOfTypeAll<T>()` | `ResourceLibrary.Get<T>( "path.ext" )` / `ResourceLibrary.GetAll<T>()` |
-| `Application.isPlaying` | `Game.IsPlaying` (or `!Game.IsEditor`) |
-| `System.IO.File.ReadAllText(...)` | `FileSystem.Data.ReadAllText(...)` / `FileSystem.Mounted.ReadAllText(...)` |
-| `UnityEngine.Networking.UnityWebRequest` | `Http.RequestStringAsync(...)` / `Http.RequestJsonAsync<T>(...)` |
-| `Update()` reads `Input.*` AND moves rigidbody | Read input in `OnUpdate`, move in `OnFixedUpdate` |
+| `Resources.Load<T>("path")` | `ResourceLibrary.Get<T>( "path.ext" )` |
+| `Application.isPlaying` | `Game.IsPlaying` |
+| `System.IO.File.ReadAllText(...)` | `FileSystem.Data.ReadAllText(...)` |
+| `UnityWebRequest` | `Http.RequestStringAsync(...)` / `Http.RequestJsonAsync<T>(...)` |
+| `PlayerPrefs` | `Game.Cookies`, see `references/services-and-persistence.md` |
+| `[MenuItem(...)]` editor script | `[EditorTool]` / `[CustomEditor]`, see `references/editor-tooling.md` |
+| `Update()` reads input and moves a rigidbody | Read input in `OnUpdate`, move in `OnFixedUpdate` |
 
-If a Unity pattern isn't in the table, assume it doesn't exist in s&box and look it up in `references/api-schema-core.md` before writing it.
-
----
-
-## The Ten Rules You Must Not Break
-
-1. **Every gameplay class extends `Component`.** Not `MonoBehaviour`, not `object`, not `ScriptableObject` — just `Component`. Mark it `sealed` unless inheritance is required.
-2. **Lifecycle methods are `protected override void On*()`.** If you wrote `void Update()` instead of `protected override void OnUpdate()`, your code does nothing.
-3. **Serialize fields with `[Property]`.** Not `[SerializeField]`, not `public` alone. `[Property]` both shows in the inspector and saves to prefab/scene.
-4. **Networked state uses `[Sync]`.** Only the object owner may assign (or only the host, with `SyncFlags.FromHost`). Everyone else sees replicated values, and their writes are **discarded silently** — no exception, no warning, the backing field is never touched. Combine with `[Change(nameof(Method))]` for scalar change callbacks; for `NetList` / `NetDictionary` subscribe to the collection's own `OnChanged` field instead. And the object must be `NetworkSpawn`ed for any of this to replicate at all.
-5. **Guard networked logic with `if ( IsProxy ) return;`.** Every component that reads input or drives movement starts with this line — otherwise every client tries to move every player.
-6. **Ray/box/sphere traces go through `Scene.Trace`.** It's a builder: `Scene.Trace.Ray(from, to).UseHitboxes(true).WithoutTags(new[]{"player"}).Run()` returns a `SceneTraceResult`. Never `Physics.Raycast`.
-7. **UI is Razor + flexbox.** `display: flex` is the default and effectively the only layout. `display: block` does not exist. Properties `:intro` / `:outro` animate creation and deletion. Every root panel overrides `BuildHash()` to control re-render.
-8. **Coroutines don't exist — use `async Task`.** `await Task.DelaySeconds( n )`, `await Task.Frame()`. Fire-and-forget with `_ = MyTask();`. The `Component.Task` property scopes cancellation to the GameObject lifetime.
-9. **Never touch blocked .NET APIs.** `System.IO.File`, `Console`, `Thread`, raw sockets, `System.Net.Http.HttpClient` — use `FileSystem.Data`, `Log`, `async/await`, `Http` instead. Code that references these won't compile in the sandbox.
-10. **Look up every API before you use it.** The schema is ground truth. If you can't find a method in `api-schema-core.md` or `api-schema-extended.md`, either you're guessing (stop) or it's nested on a specific type (search the topical reference).
+If a Unity pattern is not in this table, assume it does not exist and look it up in `references/api-schema-core.md` before writing it.
 
 ---
 
-## Project Structure (s&box Game)
+## The ten rules
 
-An s&box game project (`.sbproj`) typically looks like:
+1. **Every gameplay class extends `Component`.** Not `MonoBehaviour`, not `object`, not `ScriptableObject`. Mark it `sealed` unless something genuinely inherits from it.
+2. **Lifecycle methods are `protected override void On*()`.** Write `void Update()` instead of `protected override void OnUpdate()` and your code silently never runs.
+3. **Serialize with `[Property]`.** Not `[SerializeField]`, not bare `public`. `[Property]` both shows the field in the inspector and saves it into the prefab or scene.
+4. **Networked state uses `[Sync]`.** Only the owner may assign, or only the host with `SyncFlags.FromHost`. Everyone else sees replicated values and their writes are discarded silently, with no exception and no warning. Pair with `[Change(nameof(Method))]` for scalars; for `NetList` and `NetDictionary` subscribe to the collection's own `OnChanged` field instead. None of it replicates unless the object was `NetworkSpawn`ed.
+5. **Guard networked logic with `if ( IsProxy ) return;`.** Any component that reads input or drives movement opens with this line. Without it every client tries to move every player.
+6. **Traces go through `Scene.Trace`.** It is a builder: `Scene.Trace.Ray(from, to).UseHitboxes(true).WithoutTags(new[]{"player"}).Run()`. Never `Physics.Raycast`.
+7. **Game UI is Razor and flexbox.** `display: flex` is the default and effectively the only layout; `display: block` does not exist. `:intro` and `:outro` animate creation and deletion. Root panels override `BuildHash()` to control re-render. Editor UI is a different system entirely.
+8. **There are no coroutines.** Use `async Task` with `await Task.DelaySeconds( n )` and `await Task.Frame()`. Fire and forget with `_ = MyTask();`. The `Component.Task` property scopes cancellation to the GameObject's lifetime.
+9. **Never touch blocked .NET APIs.** `System.IO.File`, `Console`, `Thread`, raw sockets and `HttpClient` are rejected by the sandbox compiler, not at runtime. Use `FileSystem.Data`, `Log`, `async/await` and `Http`.
+10. **Look up every API before you use it.** If you cannot find a method in `api-schema-core.md` or `api-schema-extended.md`, either you are guessing, or it is nested on a specific type. Stop and check.
+
+---
+
+## Project layout
 
 ```
 MyGame/
 ├── MyGame.sbproj                 # project manifest
-├── code/                         # C# source (gameplay code)
+├── Code/                         # C# gameplay source
 │   ├── GameManager.cs
 │   ├── Player.cs
-│   ├── weapons/
-│   │   └── Rifle.cs
-│   └── ui/
-│       ├── Hud.razor             # Razor panel
-│       ├── Hud.razor.scss        # auto-loaded stylesheet
+│   └── UI/
+│       ├── Hud.razor
+│       ├── Hud.razor.scss        # auto-loaded, pairs by name
 │       └── InventoryPanel.razor
-├── ProjectSettings/              # Input.config, Platform.config, Collision.config …
-├── prefabs/                      # .prefab files
-├── scenes/                       # .scene files
-├── models/                       # .vmdl, .vmdl_c
-├── materials/                    # .vmat, .vmat_c
-├── sounds/                       # .sound, .wav, .mp3
-├── ui/                           # UI images, textures
-└── localization/
+├── Editor/                       # editor-only code, tools and inspectors
+├── ProjectSettings/              # Input.config, Platform.config, Collision.config
+├── prefabs/
+├── scenes/
+├── models/                       # .vmdl
+├── materials/                    # .vmat
+├── shaders/                      # .shader
+├── sounds/
+└── Localization/
     └── en/
         └── mygame.json
 ```
 
-Notable:
-- `.razor` and `.razor.scss` files pair by name — the stylesheet auto-loads when the panel is built.
-- `.cs` files are hot-reloaded in the editor; saving a file rebuilds and re-injects within seconds. **Do not rely on this when editing from outside the editor** — see `references/editor-and-verified-behaviour.md`.
+- `.razor` and `.razor.scss` pair by filename, and the stylesheet loads itself when the panel is built.
 - Asset paths in code are forward-slash strings rooted at the project: `Model.Load( "models/dev/box.vmdl" )`.
-- There is no `Assets/` folder; paths are flat under the project root.
-- `ProjectSettings/*.config` and the `.sbproj` are read at boot and **not watched** — an external edit needs an explicit reload or an editor restart.
+- There is no `Assets/` folder. Paths are flat under the project root.
+- `.cs` files hot-reload in the editor, but **do not rely on that when editing from outside the editor**. See `references/editor-and-verified-behaviour.md`.
+- `ProjectSettings/*.config` and the `.sbproj` are read at boot and **not watched**. An external edit needs an explicit reload or an editor restart.
 
 ---
 
-## A Reference Component (Shape Only — Not the Content)
+## The shape of a component
 
-This is the *shape* of a component. The *content* depends on what you're building — read the referenced file, then write it.
+This is the shape, not the content. What goes inside depends on what you are building, so read the reference file first.
 
 ```csharp
 using Sandbox;
@@ -218,83 +229,66 @@ public sealed class MyComponent : Component
 
     protected override void OnStart()
     {
-        // runs once before first update
     }
 
     protected override void OnUpdate()
     {
-        if ( IsProxy ) return;        // networking guard
+        if ( IsProxy ) return;
         if ( !Target.IsValid() ) return;
-
-        // per-frame logic (input, visuals, camera)
     }
 
     protected override void OnFixedUpdate()
     {
         if ( IsProxy ) return;
-        // physics / movement — deterministic timestep
     }
 
     [Rpc.Broadcast]
     public void PlayEffect( Vector3 position )
     {
-        // runs on all clients — cosmetic / non-authoritative
     }
 }
 ```
 
-For complete runnable examples — a full FPS controller, a networked player, a Razor HUD, a hitscan weapon, a NavMeshAgent AI, a physics grenade, a prefab spawner, a trigger pickup, a press-E `IPressable` vendor — see `references/patterns-and-examples.md`.
+Complete runnable examples, including an FPS controller, a networked player, a Razor HUD, a hitscan weapon, a NavMeshAgent AI, a physics grenade, a prefab spawner, a trigger pickup and a press-E vendor, are in `references/patterns-and-examples.md`.
 
 ---
 
-## Gotchas Captured From Real Builds
+## Traps worth knowing up front
 
-These are things that will bite you. They're documented deeper in the reference files; this is the quick-lookup list.
+Each of these is documented properly in a reference file. They are here because they cost real time and a model will not suspect any of them.
 
-- `ICollisionListener` parameter names are `collision`, not `other` (the raw docs are wrong about this).
-- `Color`, `Capsule`, `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox`, `Ray` are **global** types, not `Sandbox.*`.
-- `LobbyConfig` and `LobbyPrivacy` live in `Sandbox.Network` — you need `using Sandbox.Network;`.
-- `Scene` is-a `GameObject` — it *is* the root GameObject. `Scene.GetAllObjects(true)` walks the tree.
-- Most `Component.ISomething` interfaces are **nested** on `Component`: `Component.IDamageable`, `Component.ICollisionListener`, `Component.ITriggerListener`, `Component.INetworkListener`, `Component.INetworkSpawn`. But `IGameObjectNetworkEvents` is top-level `Sandbox.IGameObjectNetworkEvents`.
-- `ComponentList.GetOrCreate<T>( FindMode )` requires the `FindMode` arg. For the common "on this GameObject" case, use `GetOrAddComponent<T>()` on `GameObject` or `Component` instead.
-- `SceneTrace.WithoutTags` / `WithAnyTags` / `WithAllTags` take `string[]` — not `params`. Pass `new[] { "tag" }`, or use `WithTag(string)` for the single-tag case.
-- `Game.Random` is `System.Random` — `NextSingle()`, `Next(n)` work directly. The `FromList` extension exists but requires a `defVal`; `list[Game.Random.Next(list.Count)]` is simpler.
-- `FileSystem` is a static facade. Actual methods are on `BaseFileSystem`, accessed via `FileSystem.Data` (game user data) or `FileSystem.Mounted` (mounted content).
-- There is no standalone `Log` class — it's `Sandbox.Diagnostics.Logger`, but the global `Log` instance works fine everywhere.
-- `PlayerController.TraceBody` has **4** parameters (the 4th is `heightScale`), not 3.
-- Operators (`Rotation * Rotation`, `Vector3 * Rotation`) aren't listed in the API schema because they're systematically excluded — they do exist, use them normally.
-- `NavigationHost` is in `Sandbox.UI.Navigation`, needs `@using Sandbox.UI.Navigation` in your Razor file.
-- **`[GameResource(...)]` is obsolete engine-wide.** Custom data assets use `[AssetType( Name = ..., Extension = ..., Category = ... )]` — property initializers, not constructor args. Under `TreatWarningsAsErrors` the old attribute is a build failure.
-- **`Model.Load( "typo/path.vmdl" )` returns `null`**, not `Model.Error`. Only a null/empty path gives you the error placeholder. Null-check every `Model.Load`.
-- **`GameObject.NetworkSpawn()` with no arguments owns the object to `Connection.Local`** — whoever called it. For a host-authoritative world object that is a quiet wrong-owner trap. Always pass an explicit owner.
-- **`NetworkMode.Snapshot` is the default for scene objects and does not live-replicate `[Sync]`** — while RPCs keep working perfectly. Stale-state bugs here look like nothing is wrong.
-- **`[Sync]` writes you aren't allowed to make are dropped before the backing field** — no exception, no warning, and the immediate read-back already shows the authoritative value. Same for every `NetList<T>` mutation.
-- **`NetList<T>.OnChanged` is a public `Action<NetListChangeEvent<T>>` field, not `[Change]`.** `[Change]` wraps the property *setter*, so on a collection it only fires if you reassign the whole thing.
-- **`IPressable.Press` executes on the pressing CLIENT.** The whole USE pipeline runs inside `if ( !IsProxy )` on the player. Authoritative effects need an `[Rpc.Host]`.
-- **`Prop` is breakable, flammable and gibbable, not just "a model with physics."** For a non-destructible object compose `ModelRenderer` + `ModelCollider` + `Rigidbody` yourself. Its `Break()` method is an editor button that decomposes the component — it does not break the prop.
-- **`Sandbox.Platform.Chat` is a global pipe that exists whether your gamemode uses it or not.** `ChatShowUI: false` only hides the overlay; `Say()` still broadcasts. Disable it at the source with `"ChatEnabled": false` in `ProjectSettings/Platform.config`.
-- **Externally edited `.sbproj` / `.config` files are not watched**, and after in-process compiler recreation the source file watchers stop firing. Rebuild explicitly and check compile status; never infer success from the absence of errors.
-- `PlayerController.IEvents.PostCameraSetup` is obsolete — implement `ICameraModifier` instead.
+- `ICollisionListener` names its parameter `collision`, not `other`. The published docs are wrong about this.
+- `Color`, `Capsule`, `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox` and `Ray` are global types, not `Sandbox.*`.
+- `LobbyConfig` and `LobbyPrivacy` need `using Sandbox.Network;`.
+- `Scene` is-a `GameObject`. It is the root. `Scene.GetAllObjects(true)` walks the tree.
+- Most `Component.ISomething` interfaces are nested on `Component`, including `IDamageable`, `ICollisionListener`, `ITriggerListener`, `INetworkListener` and `INetworkSpawn`. But `IGameObjectNetworkEvents` is top-level `Sandbox.IGameObjectNetworkEvents`.
+- `SceneTrace.WithoutTags` / `WithAnyTags` / `WithAllTags` take `string[]`, not params. Pass `new[] { "tag" }`, or use `WithTag(string)`.
+- `Game.Random` is a `System.Random`. `list[Game.Random.Next(list.Count)]` is simpler than the `FromList` extension, which needs a default value.
+- `FileSystem` is a static facade. The methods live on `BaseFileSystem`, reached through `FileSystem.Data` or `FileSystem.Mounted`.
+- `PlayerController.TraceBody` takes four parameters. The fourth is `heightScale`.
+- Operators such as `Rotation * Rotation` are missing from the schema because the extraction excludes them systematically. They exist, use them.
+- **`[GameResource(...)]` is obsolete engine-wide.** Custom data assets use `[AssetType( Name = ..., Extension = ..., Category = ... )]` with property initializers, not constructor arguments. Under `TreatWarningsAsErrors` the old attribute is a build failure.
+- **`Model.Load( "typo/path.vmdl" )` returns `null`**, not `Model.Error`. Only a null or empty path gives the error placeholder. Null-check every load.
+- **`GameObject.NetworkSpawn()` with no arguments assigns ownership to `Connection.Local`**, whoever called it. For a host-authoritative world object that is a quiet wrong-owner bug. Always pass an explicit owner.
+- **`NetworkMode.Snapshot` is the default for scene objects and does not live-replicate `[Sync]`**, while RPCs keep working perfectly. Stale-state bugs here look like nothing is wrong.
+- **`NetList<T>.OnChanged` is a public `Action<NetListChangeEvent<T>>` field, not `[Change]`.** `[Change]` wraps the property setter, so on a collection it only fires when you reassign the whole thing.
+- **`IPressable.Press` runs on the pressing client.** The USE pipeline sits inside `if ( !IsProxy )` on the player, so authoritative effects need an `[Rpc.Host]`.
+- **`Prop` is breakable, flammable and gibbable.** For a non-destructible object, compose `ModelRenderer` + `ModelCollider` + `Rigidbody` yourself. Its `Break()` method is an editor button that decomposes the component; it does not break the prop.
+- **`Sandbox.Platform.Chat` is a global pipe that exists whether your gamemode uses it or not.** `ChatShowUI: false` only hides the overlay and `Say()` still broadcasts. Disable it with `"ChatEnabled": false` in `ProjectSettings/Platform.config`.
+- **`Mixer.Spacializing` is an obsolete alias for `Mixer.Spatializing`.** Both spellings exist, the misspelled one forwards to the correct one, and deserialization accepts either key.
+- `PlayerController.IEvents.PostCameraSetup` is obsolete. Implement `ICameraModifier` instead.
 
 ---
 
-## Verification Loop (When In Doubt)
+## When you are not sure an API exists
 
-If you're about to write an API call and you're not sure it exists:
+1. **Check the topical file** for that area first. Topical files carry inline signatures for what they cover.
+2. **Then `api-schema-core.md`**, which has full signatures for the most-used types.
+3. **Then `api-schema-extended.md`**, a namespace-organised index of the wider surface. Find the type, then get its full signature elsewhere.
+4. **If it is in none of them, it does not exist.** Do not write it. There is almost always an idiomatic way to do what you wanted.
 
-1. **Check the topical file** for the area first (`networking.md`, `ui-razor.md`, etc.). Topical files include inline signatures for the APIs they cover.
-2. **If not there, check `api-schema-core.md`.** It has full signatures for the ~50 most-used types.
-3. **If not there, check `api-schema-extended.md`.** It's a namespace-organized index of 738 more types — find the type, then look up full signatures elsewhere if needed.
-4. **If a method or property is in NONE of the above, it does not exist.** Do not write it. Revisit your design — there is almost certainly an s&box-idiomatic way to do what you want.
-
-A schema entry proves an API *exists*; it does not prove it *behaves* the way you assume.
-The traps in this skill are almost all cases where a correct-looking call silently does
-nothing. `references/editor-and-verified-behaviour.md` records which behaviours have been
-observed in a live editor session (with dates and evidence) versus merely read out of the
-source — check it before you conclude "the API says this should work."
-
-The schema under `raw/api-schema.json` is not shipped with the skill and is not for you to read directly; the reference files are the curated, searchable view of it.
+A schema entry proves an API exists. It does not prove it behaves the way you assume, and nearly every trap above is a case where a correct-looking call silently does nothing. `references/editor-and-verified-behaviour.md` records which behaviours were observed in a live editor session, with dates, as opposed to merely read out of source. Check it before concluding that the API says something should work.
 
 ---
 
-*This file is a router. Reference files teach. Do not answer s&box questions from SKILL.md alone — open the relevant reference and read it.*
+*This file routes. The reference files teach. Do not answer an s&box question from this file alone.*

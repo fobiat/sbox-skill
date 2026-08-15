@@ -1,20 +1,20 @@
 # UI & Razor Panels
 
-Razor panels, SCSS styling, Panel lifecycle, data binding, events, built-in controls, and navigation.
+Razor panels, SCSS styling, Panel lifecycle, data binding, events, built-in controls, and navigation. Everything here was read out of the engine source at version **26.08.05** (`sbox-public`).
 
 ---
 
 ## Architecture
 
-s&box UI uses a **Panel** tree with CSS flexbox layout. Panels can be created in pure C# or with Razor (HTML/CSS + C#). Razor is syntactic convenience — it renders identically to C# panels.
+s&box UI is a **Panel** tree laid out with CSS flexbox. You can build panels in pure C# or in Razor (HTML/CSS plus C#); Razor is a convenience layer over the same tree, and it renders identically to hand-written C# panels either way.
 
 **Hierarchy:** `ScreenPanel` or `WorldPanel` component (on a GameObject) → `PanelComponent` (root) → child `Panel`s
 
-- `PanelComponent` extends `Component` — it's a scene component, NOT a Panel
-- `Panel` is the UI base class — all UI elements inherit from it
-- `PanelComponent.Panel` gives you the root `Panel` to parent children to
+- `PanelComponent` extends `Component`. It's a scene component, not a Panel.
+- `Panel` is the actual UI base class. Every UI element inherits from it.
+- `PanelComponent.Panel` gives you the root `Panel`, so you have something to parent children to.
 
-**Key distinction:** You cannot nest a `PanelComponent` inside another panel with `<MyPanelComponent />`. PanelComponents must be on a GameObject with ScreenPanel/WorldPanel. Only `Panel` subclasses can be nested in Razor.
+**The distinction that trips people up:** you cannot nest a `PanelComponent` inside another panel with `<MyPanelComponent />`. A PanelComponent has to live on a GameObject carrying a ScreenPanel or WorldPanel. Only `Panel` subclasses can be nested inside Razor markup.
 
 ---
 
@@ -23,9 +23,9 @@ s&box UI uses a **Panel** tree with CSS flexbox layout. Panels can be created in
 ### File Structure
 
 ```
-MyHud.razor          # PanelComponent (root) — add to GameObject with ScreenPanel
+MyHud.razor          # PanelComponent (root): add to GameObject with ScreenPanel
 MyHud.razor.scss     # Auto-loaded stylesheet (naming convention)
-HealthBar.razor      # Child Panel — used inside MyHud
+HealthBar.razor      # Child Panel: used inside MyHud
 HealthBar.razor.scss
 ```
 
@@ -73,20 +73,22 @@ HealthBar.razor.scss
 
 ### Key Rules
 
-- `<root>` wraps all HTML. If omitted, elements parent to the panel root automatically.
-- `@code { }` block contains C# — properties, methods, overrides.
-- `@` prefix injects C# expressions into HTML: `@MyVar`, `@(expression)`, `@foreach`, `@if`.
-- `return;` in Razor stops rendering beyond that point.
+A few things that don't show up until you hit them:
+
+- `<root>` wraps all your HTML. Leave it out and s&box parents elements to the panel root automatically.
+- `@code { }` holds the C#: properties, methods, overrides.
+- The `@` prefix injects a C# expression into HTML: `@MyVar`, `@(expression)`, `@foreach`, `@if`.
+- A `return;` inside the Razor body stops rendering beyond that point.
 
 ### BuildHash
 
-The panel only rebuilds when `BuildHash()` returns a different value. Include all data the template depends on:
+Razor panels don't re-render every frame. Whatever `BuildHash()` returns gets compared against last frame's value, and the template body only re-executes when it changes. That's why every piece of data the template reads has to go into the hash: leave one out, and the panel keeps showing a stale value for that field even while everything else updates around it.
 
 ```csharp
 protected override int BuildHash() => System.HashCode.Combine( Health, Armor, IsAlive );
 ```
 
-Also rebuilds on pointer-events interaction (hover, click). Force rebuild with `StateHasChanged()`.
+Hover and click also force a rebuild, since those flip pseudo-class state the CSS may depend on. Call `StateHasChanged()` to force one yourself.
 
 ### Passing Properties
 
@@ -105,7 +107,7 @@ Also rebuilds on pointer-events interaction (hover, click). Force rebuild with `
 
 ### Two-Way Binding
 
-`:bind` syncs a property bidirectionally with a control:
+`:bind` keeps a property and a control's value in sync in both directions, so you don't have to wire a change handler by hand:
 
 ```razor
 <SliderControl Min=@(0) Max=@(100) Step=@(1) Value:bind=@Volume />
@@ -118,7 +120,7 @@ Also rebuilds on pointer-events interaction (hover, click). Force rebuild with `
 
 ### RenderFragment (Reusable Components)
 
-Define slots for content injection:
+A `RenderFragment` property is a slot: the caller supplies markup, the component decides where it lands.
 
 ```razor
 <!-- InfoCard.razor -->
@@ -142,7 +144,7 @@ Usage:
 </InfoCard>
 ```
 
-All panels have a built-in `ChildContent` fragment:
+Every panel gets a built-in `ChildContent` fragment for free, so a component that only needs one slot doesn't need to declare one:
 ```razor
 <InfoCard>
     <ChildContent>
@@ -152,6 +154,8 @@ All panels have a built-in `ChildContent` fragment:
 ```
 
 ### RenderFragment\<T\> (Templated Components)
+
+The typed version passes a value into the slot's markup, which is what makes list rows and item templates work:
 
 ```razor
 <!-- PlayerList.razor -->
@@ -173,7 +177,7 @@ Usage with `Context`:
     <PlayerRow Context="item">
         @if (item is Player player)
         {
-            <label>@player.Name — @player.Health HP</label>
+            <label>@player.Name, @player.Health HP</label>
         }
     </PlayerRow>
 </PlayerList>
@@ -212,15 +216,15 @@ Usage in Razor: `<MyPanel T="string" Value=@("hello") />`
 
 ### SCSS Stylesheets
 
-Auto-loaded by naming convention: `MyPanel.razor` → `MyPanel.razor.scss`
+A stylesheet loads automatically by naming convention: `MyPanel.razor` picks up `MyPanel.razor.scss` with no wiring required.
 
-Or load explicitly:
+Or load one explicitly:
 ```csharp
 [StyleSheet( "path/to/style.scss" )]
 public class MyPanel : Panel { }
 ```
 
-Import other stylesheets:
+Import other stylesheets the normal SCSS way:
 ```scss
 @import "shared/buttons.scss";
 ```
@@ -251,7 +255,7 @@ Import other stylesheets:
 myPanel.Style.Width = Length.Percent( progress * 100f );
 myPanel.Style.BackgroundColor = Color.Red;
 myPanel.Style.Opacity = 0.5f;
-myPanel.Style.Dirty();  // mark as needing re-render
+myPanel.Style.Dirty();  // flags the style as changed, forcing a re-layout
 ```
 
 ### CSS Classes (C# API)
@@ -270,7 +274,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ## Layout System
 
-**Everything is flexbox.** `display: flex` is the default (and the only display mode besides `none`).
+**Everything is flexbox.** `display: flex` is the default, and the only display mode besides `none`. There's no grid, no inline, no block, so any CSS knowledge that assumes those modes doesn't transfer.
 
 ### Key Layout Properties
 
@@ -284,11 +288,13 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 | `flex-grow` | float | `0` |
 | `flex-shrink` | float | `1` |
 | `flex-basis` | Length | `auto` |
-| `gap` | Length | — |
+| `gap` | Length | none |
 | `position` | `static`, `relative`, `absolute` | `static` |
 | `overflow` | `visible`, `hidden`, `scroll` | `visible` |
 
 ### Length Units
+
+`Length` is the C# type behind every dimension in the style system, whether you set it from SCSS or from code.
 
 | Unit | SCSS | C# |
 |------|------|----|
@@ -299,7 +305,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 | Root em | `2rem` | `Length.Rem( 2 )` |
 | Em | `1.5em` | `Length.Em( 1.5f )` |
 | Auto | `auto` | `Length.Auto` |
-| Fraction | — | `Length.Fraction( 1 )` |
+| Fraction | n/a | `Length.Fraction( 1 )` |
 | Calc | `calc(100% - 20px)` | `Length.Calc( "100% - 20px" )` |
 
 ---
@@ -307,6 +313,8 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 ## Transitions & Animations
 
 ### CSS Transitions
+
+Standard CSS transitions work as expected:
 
 ```scss
 .button {
@@ -323,7 +331,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ### Intro/Outro (s&box specific)
 
-`:intro` pseudo-class is active when the element is first created — properties transition FROM this state. `:outro` is added when `Panel.Delete()` is called — the panel waits for transitions to complete before actual deletion.
+Web CSS has no equivalent to these two: `:intro` is active for one frame when the element is first created, so whatever properties you set under it become the state the element transitions FROM. `:outro` gets added the moment `Panel.Delete()` is called, and the panel actually waits for its transitions to finish playing before it's removed for real, which is what makes fade-out and slide-out effects on deletion possible at all.
 
 ```scss
 .notification {
@@ -361,6 +369,8 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ### Sound on State Change
 
+`sound-in` and `sound-out` fire off a sound the instant a pseudo-class is applied or removed, no C# event handler needed:
+
 ```scss
 .button {
     sound-in: "ui.button.over";   // play when :hover applied
@@ -392,7 +402,7 @@ panel.DeleteChildren()          // remove all children
 panel.SortChildren( comparison )
 panel.SetChildIndex( child, i )
 panel.Delete()                  // remove (respects :outro transitions)
-panel.IsDeleting                // bool — in outro phase
+panel.IsDeleting                // bool, true while in outro phase
 ```
 
 ### Identity & Classes
@@ -417,8 +427,8 @@ panel.SetMouseCapture( true )   // capture all mouse input
 ### Scrolling
 
 ```csharp
-panel.ScrollOffset              // Vector2 — current scroll position
-panel.ScrollSize                // Vector2 — total scrollable area
+panel.ScrollOffset              // Vector2, current scroll position
+panel.ScrollSize                // Vector2, total scrollable area
 panel.HasScrollX / HasScrollY   // bool
 panel.TryScroll( delta )        // attempt scroll
 panel.TryScrollToBottom()
@@ -426,6 +436,8 @@ panel.PreferScrollToBottom      // auto-scroll to bottom (chat logs)
 ```
 
 ### Events
+
+Panels can listen for events three ways: the attribute, a direct listener, or a Razor attribute.
 
 ```csharp
 // Event listener via attribute
@@ -448,6 +460,8 @@ panel.PanelPositionToScreenPosition( panelPos )     // → Vector2
 ```
 
 ### Builder Pattern
+
+Useful for building panels from pure C# without a `.razor` file:
 
 ```csharp
 var row = panel.Add.Panel( "row" );
@@ -607,7 +621,7 @@ Toggle switch.
 
 ## VirtualGrid
 
-Efficient rendering for large item collections. Only creates visible items.
+Rendering thousands of item panels the normal way means thousands of live Panel objects, most of them off-screen. `VirtualGrid` only creates panels for items actually in view, and recycles them as you scroll.
 
 ```razor
 <VirtualGrid Items=@AllItems ItemSize=@(new Vector2(120, 120))>
@@ -620,16 +634,16 @@ Efficient rendering for large item collections. Only creates visible items.
 </VirtualGrid>
 ```
 
-- `Items` accepts any `IEnumerable<T>`
-- `ItemSize` is `Vector2` — cells scale to fill width, preserving aspect ratio
-- Must have explicit size in CSS (`width: 100%; height: 100%`)
-- Use `gap` CSS property for spacing
+- `Items` accepts any `IEnumerable<T>`.
+- `ItemSize` is a `Vector2`: cells scale to fill the available width, preserving aspect ratio.
+- The grid needs an explicit size in CSS (`width: 100%; height: 100%`), since it can't infer one from virtualized content.
+- Use the `gap` CSS property for spacing between cells.
 
 ---
 
 ## Navigation
 
-`NavigationHost` (in `Sandbox.UI.Navigation`) acts like a single-page website — one panel visible at a time, with back/forward history.
+`NavigationHost` (in `Sandbox.UI.Navigation`) behaves like a single-page website: one panel visible at a time, with back/forward history tracked for you.
 
 ```razor
 @using Sandbox.UI.Navigation
@@ -644,7 +658,7 @@ Efficient rendering for large item collections. Only creates visible items.
 </root>
 ```
 
-Register pages:
+Register pages up front, then navigate:
 ```csharp
 protected override void OnStart()
 {
@@ -664,7 +678,7 @@ protected override void OnStart()
 
 Pages can implement `INavigatorPage` for `OnNavigationOpen()` / `OnNavigationClose()` callbacks.
 
-`NavLinkPanel` auto-applies the `.active` class when its `Href` matches the current URL.
+`NavLinkPanel` auto-applies the `.active` class when its `Href` matches the current URL, so a nav bar's highlight state needs no extra code.
 
 ---
 
@@ -677,7 +691,7 @@ Pages can implement `INavigatorPage` for `OnNavigationOpen()` / `OnNavigationClo
 | `ButtonEvent` | `Button`, `Pressed`, `HasShift/Ctrl/Alt` | Keyboard/mouse press |
 | `DragEvent` | (inherits PanelEvent) | Drag operations |
 | `PasteEvent` | `ClipboardValue` | Paste action |
-| `EscapeEvent` | — | Escape key |
+| `EscapeEvent` | n/a | Escape key |
 
 ### Common Razor Events
 
@@ -692,7 +706,7 @@ Pages can implement `INavigatorPage` for `OnNavigationOpen()` / `OnNavigationClo
 
 ## Localization
 
-Strings prefixed with `#` are localization tokens, automatically resolved:
+Any string prefixed with `#` is treated as a localization token and resolved automatically, in markup or in a control property:
 
 ```razor
 <label>#menu.play</label>
@@ -707,13 +721,15 @@ Token file: `Localization/en/mygame.json`
 }
 ```
 
-Supports 31 languages. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-cn`, `zh-tw`, `ru`, `pt-br`, etc.
+31 languages are supported. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-cn`, `zh-tw`, `ru`, `pt-br`, etc.
 
 ---
 
 ## Common Style Properties (Quick Reference)
 
 ### Differences from Web CSS
+
+If you're coming from browser CSS, these are the places s&box's style engine diverges:
 
 | Property | s&box Behavior |
 |----------|---------------|
@@ -725,6 +741,8 @@ Supports 31 languages. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-c
 | `sound-in` / `sound-out` | Play sounds on style apply/remove. |
 | `background-image-tint` | Custom. Multiplies background image by color. |
 | `content` | Sets `Label.Text` directly. |
+
+Note `pointer-events` in particular: a panel that looks clickable but silently eats no input is almost always missing `pointer-events: all` somewhere in its ancestor chain, since the default is `none`.
 
 ### Common Patterns
 
@@ -762,7 +780,7 @@ Supports 31 languages. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-c
 
 ## Complete Working Example
 
-A HUD with health bar and kill feed:
+A HUD with health bar and kill feed, showing a PanelComponent, its stylesheet, and `:intro`/`:outro` together:
 
 **MyHud.razor:**
 ```razor

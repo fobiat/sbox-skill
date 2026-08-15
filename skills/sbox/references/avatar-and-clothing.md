@@ -180,7 +180,7 @@ outfit.Apply( body );
 
 `Apply( SkinnedModelRenderer body )` is synchronous and does the whole job in one pass:
 
-1. `Reset( body )` — destroys every existing child GameObject tagged `"clothing"`, resets
+1. `Reset( body )` destroys every existing child GameObject tagged `"clothing"`, resets
    `scale_height` to 1, `MaterialGroup` to `"default"`, clears `MaterialOverride`, restores
    `BodyGroups` to `body.Model.Parts.DefaultMask`.
 2. Sets `scale_height` from `Height` (remapped 0-1 → 0.8-1.2) and `scale_heel` from the
@@ -276,7 +276,7 @@ outfit.ApplyAsync( targetRenderer, token );
 ```
 
 `CreateFromConnection` reads `connection.GetUserData( "avatar" )`, parses it, and (unless
-`removeUnowned: false`) strips items the connection isn't verified to own — via
+`removeUnowned: false`) strips items the connection isn't verified to own, via
 `connection.HasInventoryItem`, which only resolves for remote connections on the host
 (`Networking.IsHost`); a client asking about another client's ownership gets nothing
 stripped, by design, since it has no visibility into that data.
