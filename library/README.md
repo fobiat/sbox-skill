@@ -41,7 +41,8 @@ and the page reads Released.
 library/
   sbox_mcp_server.sbproj   Type: library, Org: fobiat, Ident: sbox_mcp_server
   Editor/
-    SboxMcpServer.cs       byte-identical copy of editor-mcp/SboxMcpServer.cs
+    SboxMcpServer.cs         byte-identical copy of editor-mcp/SboxMcpServer.cs
+    SboxMcpServer.Editor.cs  byte-identical copy of editor-mcp/SboxMcpServer.Editor.cs
   ProjectSettings/         Collision, Input and Platform defaults the editor writes
 ```
 
@@ -56,10 +57,10 @@ The editor also rewrites the `.sbproj` on first open, dropping `Tags`, `HasAsset
 same shape as Facepunch's own shipped `editor/DooEditor/DooEditor.sbproj`. Tags now live on the
 asset.party page rather than in the project file.
 
-`editor-mcp/SboxMcpServer.cs` stays canonical. A library cannot reference a source file outside
-its own project root, so this is a copy rather than a link, kept honest by two things: run
-`python3 scripts/sync_library.py` after editing the canonical file, and
-`scripts/verify_release.py` fails the build if the two ever differ.
+`editor-mcp/SboxMcpServer*.cs` stays canonical. A library cannot reference a source file outside
+its own project root, so these are copies rather than links, kept honest by two things: run
+`python3 scripts/sync_library.py` after editing a canonical file, and
+`scripts/verify_release.py` fails the build if any pair ever differs.
 
 ## Republishing it
 

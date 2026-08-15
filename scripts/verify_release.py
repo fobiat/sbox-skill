@@ -28,7 +28,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "sbox"
-MCP = ROOT / "editor-mcp" / "SboxMcpServer.cs"
+MCP_FILES = (ROOT / "editor-mcp" / "SboxMcpServer.cs", ROOT / "editor-mcp" / "SboxMcpServer.Editor.cs")
 PLUGIN_DIR = ROOT / ".claude-plugin"
 LIBRARY = ROOT / "library"
 SELF = "scripts/verify_release.py"
@@ -141,7 +141,7 @@ def frontmatter_field(frontmatter, key):
 
 def check_toolset():
     section("MCP TOOLSET")
-    src = MCP.read_text(encoding="utf-8")
+    src = "\n".join(f.read_text(encoding="utf-8") for f in MCP_FILES)
 
     readonly = set(re.findall(r'\[McpTool\.ReadOnly\(\s*"([a-z0-9_]+)"', src))
     mutating = set(re.findall(r'\[McpTool\(\s*"([a-z0-9_]+)"', src))
@@ -248,9 +248,11 @@ def check_distribution(plugin):
     # Title is the display name on asset.party, so the ident is the wrong thing to see there
     check(sbproj["Title"] != sbproj["Ident"], "sbproj title is a display name", sbproj["Title"])
 
-    # the library ships a copy, and a drifted copy is a silently wrong package
-    check((LIBRARY / "Editor" / "SboxMcpServer.cs").read_bytes() == MCP.read_bytes(),
-          "library copy identical to editor-mcp")
+    # the library ships a copy of each, and a drifted copy is a silently wrong package
+    for source in MCP_FILES:
+        target = LIBRARY / "Editor" / source.name
+        check(target.is_file() and target.read_bytes() == source.read_bytes(),
+              f"library copy of {source.name} identical to editor-mcp")
 
 
 def check_changelog(plugin):

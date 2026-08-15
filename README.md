@@ -109,7 +109,7 @@ Install this and the second one is what you get.
 
 Published on asset.party as
 **[`fobiat.sbox_mcp_server`](https://sbox.game/fobiat/sbox_mcp_server/)**, or
-[one file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder. Either way, eighteen tools
+[two files](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder. Either way, eighteen tools
 onto the editor's MCP server. It solves a different silent failure: the editor not noticing you
 changed anything.
 
@@ -165,7 +165,7 @@ Settings, add `fobiat.sbox_mcp_server` to package references, restart. The
 it compiles into your project, which is a reasonable thing to want:
 
 ```powershell
-Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
+Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs,sbox-skill\editor-mcp\SboxMcpServer.Editor.cs your-game\Editor\
 ```
 
 Restart the editor either way, then run `list_toolsets`. Details in
@@ -254,7 +254,7 @@ The repo is its own plugin marketplace, so there is nothing to clone and nothing
 ```
 
 The skill triggers on its own frontmatter, and `/plugin update` brings new engine versions with
-it. `editor-mcp/SboxMcpServer.cs` comes along in the installed plugin, so the
+it. `editor-mcp/SboxMcpServer*.cs` comes along in the installed plugin, so the
 [toolset](#the-sbox-mcp-server) is a file copy away rather than another download.
 
 </details>

@@ -97,11 +97,11 @@ file it routes you to. Do not write an API that is not in those files.
 As a package reference: open Project Settings, add `fobiat.sbox_mcp_server`, restart. The
 listing is [s&box MCP Server & AI Skill](https://sbox.game/fobiat/sbox_mcp_server/).
 
-Or one file into your project's `Editor/` folder:
+Or two files into your project's `Editor/` folder:
 
 ```powershell
 New-Item -ItemType Directory -Force your-game\Editor | Out-Null
-Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
+Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs,sbox-skill\editor-mcp\SboxMcpServer.Editor.cs your-game\Editor\
 ```
 
 `Editor/` matters. It is a separately compiled assembly that s&box builds **without** the BCL

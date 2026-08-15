@@ -87,14 +87,14 @@ into your project:
 
 ```powershell
 New-Item -ItemType Directory -Force your-game\Editor | Out-Null
-Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
+Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs,sbox-skill\editor-mcp\SboxMcpServer.Editor.cs your-game\Editor\
 ```
 
 <details><summary>bash</summary>
 
 ```bash
 mkdir -p your-game/Editor
-cp sbox-skill/editor-mcp/SboxMcpServer.cs your-game/Editor/
+cp sbox-skill/editor-mcp/SboxMcpServer.cs sbox-skill/editor-mcp/SboxMcpServer.Editor.cs your-game/Editor/
 ```
 
 </details>

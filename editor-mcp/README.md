@@ -8,9 +8,9 @@
 [![Engine](https://img.shields.io/badge/s%26box-26.08.05-3e3e3e?style=flat-square)](https://sbox.game)
 [![Licence](https://img.shields.io/badge/licence-MIT-3fb950?style=flat-square)](../LICENSE)
 [![Tools](https://img.shields.io/badge/tools-18-00a8e8?style=flat-square)](SboxMcpServer.cs)
-[![Single file](https://img.shields.io/badge/install-1_file-4c8eda?style=flat-square)](SboxMcpServer.cs)
+[![Two files](https://img.shields.io/badge/install-2_files-4c8eda?style=flat-square)](SboxMcpServer.cs)
 
-*A package reference, or one file in `Editor/`. Restart, done.*
+*A package reference, or two files in `Editor/`. Restart, done.*
 
 </div>
 
@@ -60,12 +60,14 @@ listing is gated on an attribute internal to the engine, so these are reached th
 restart. Nothing to clone, and the editor's own package flow brings updates. The
 [library project](../library) that builds it is in this repo.
 
-**As a file**, if you would rather read an unsandboxed `Editor/` assembly before it compiles
-into your project:
+**As files**, if you would rather read an unsandboxed `Editor/` assembly before it compiles
+into your project. Two files, one `partial class SboxMcpServer`: split at 1000 lines because
+that is the largest a single file can be under most projects' own file-size gates, not because
+the engine requires it.
 
 ```bash
 mkdir -p your-game/Editor
-cp editor-mcp/SboxMcpServer.cs your-game/Editor/
+cp editor-mcp/SboxMcpServer.cs editor-mcp/SboxMcpServer.Editor.cs your-game/Editor/
 ```
 
 > Pairing this with the skill? The **[Quickstart](../QUICKSTART.md)** covers the loop the two

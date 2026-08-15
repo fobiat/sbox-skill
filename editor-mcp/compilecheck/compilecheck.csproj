@@ -63,6 +63,7 @@
 
   <ItemGroup>
     <Compile Include="../SboxMcpServer.cs" />
+    <Compile Include="../SboxMcpServer.Editor.cs" />
   </ItemGroup>
 
   <ItemGroup Condition="'$(CompileCheckAnalyzers)' != 'false'">
