@@ -31,6 +31,12 @@ listing art, and the documentation catching up to both.
 - **`editor-mcp/README.md` advertised eleven tools on its badge**, three releases after the
   count reached eighteen.
 - **A dead anchor in `README.md`**, pointing at a heading renamed in 0.4.0.
+- **`SboxMcpServer.cs` failed a 1000-line file-size gate in consuming projects.** Split into
+  `SboxMcpServer.cs` and `SboxMcpServer.Editor.cs`, two halves of one `partial class`, so the
+  file-drop install fits under the file-size limit most projects enforce on their own `Editor/`
+  tree. The toolset, its tool names and its behaviour are unchanged; the package reference is
+  unaffected either way. Verified against real engine assemblies in both nullable configurations
+  and by a live hotload rebuild.
 
 ### Changed
 - **The two halves are named the MCP Server and the AI Agent Skill on the listing.** The word
@@ -40,7 +46,7 @@ listing art, and the documentation catching up to both.
 - **Every install path now leads with the package reference**, in `README.md`, `QUICKSTART.md`,
   `GUIDE.md` and `editor-mcp/README.md`. The file drop is kept alongside it rather than
   demoted, since reading an unsandboxed `Editor/` file before it compiles into your project is
-  a reasonable thing to want.
+  a reasonable thing to want. **The file drop is now two files, not one**, per the split above.
 - **`library/README.md` records the publish** rather than describing it as untested, and keeps
   the listing's title, summary and tags so the art can be regenerated to match.
 
