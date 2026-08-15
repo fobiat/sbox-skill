@@ -35,6 +35,7 @@ Built and maintained by Kyle (fobiat).
 - [Field notes: the part you cannot get from docs](#field-notes-the-part-you-cannot-get-from-docs)
 - [Engine version and drift](#engine-version-and-drift)
 - [Contributing](#contributing)
+- [Credits](#credits)
 - [Licence](#licence)
 
 ---
@@ -241,23 +242,36 @@ That third rule is what the field notes exist for.
 ## Bonus: the `sbox_dev` editor MCP toolset
 
 [`editor-mcp/SboxDevTools.cs`](editor-mcp/SboxDevTools.cs) is a drop-in file for your
-project's `Editor/` folder. It adds six MCP tools to the editor's embedded server, covering
-the one thing the stock toolsets do not: getting source you edited on disk to actually
-compile.
+project's `Editor/` folder. It adds nine MCP tools to the editor's embedded server, covering
+the one thing the stock toolsets do not: getting the editor to notice that you changed
+something on disk.
 
-Two engine behaviours make that harder than it sounds. Nothing watches the `.sbproj` for
-external edits, so a changed `Metadata.Compiler` block never reaches Roslyn. And after
-compilers are recreated in-process, their source file watchers have been observed to stop
-firing. In both cases you edit, see no error, and get no effect.
+Three separate engine behaviours stop it noticing, and none of them raises an error. The
+`.sbproj` is read once at boot and never watched. `ProjectSettings/*.config` is cached on
+first read and never invalidated. Compiler file watchers go stale after the compilers are
+recreated in-process. Every one of them leaves you having edited a file, seen nothing happen,
+and concluded your edit was wrong.
 
-| Tool | Does |
-|---|---|
-| `project_info` | What is open, and the compiler settings **live in memory** rather than on disk |
-| `project_compilers` | Per-compiler `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
-| `project_compile_errors` | Diagnostics as rows with file and line, no console scraping |
-| `project_reload_config` | Re-read an externally edited `.sbproj` into the live config |
-| `project_rebuild` | Recreate compilers and start a build, returns immediately |
-| `project_build` | Rebuild and wait, then report success plus errors |
+| Tool | Reads or writes | Does |
+|---|---|---|
+| `project_info` | read | What is open, and the compiler settings **live in memory** rather than on disk |
+| `project_compilers` | read | Per compiler `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
+| `project_source_changes` | read | What each compiler has actually noticed since its last build |
+| `project_compile_errors` | read | Diagnostics as rows with file and line, no console scraping |
+| `project_input_actions` | read | Every input action the project defines, with its bindings |
+| `project_reload_config` | write | Re-read an externally edited `.sbproj` into the live config |
+| `project_reload_settings` | write | Drop the cached `ProjectSettings` so the configs come back off disk |
+| `project_rebuild` | write | Recreate compilers and start a build, returns immediately |
+| `project_build` | write | Rebuild and wait, then report success plus errors |
+
+`project_source_changes` is the one that saves the most time, because it separates "the
+compiler never saw my file" from "the compiler saw it and rejected it". Those are very
+different problems that look identical from the console.
+
+`project_input_actions` earns its place for a subtler reason. Input actions are strings
+resolved at runtime, so `Input.Down( "jump" )` against an action that does not exist compiles
+cleanly and silently never fires. An agent writing input code cannot know the real vocabulary
+unless something hands it over.
 
 Full details, including every reflected engine member and where it lives upstream, in
 [`editor-mcp/README.md`](editor-mcp/README.md).
@@ -314,6 +328,27 @@ that frontmatter is intact, and that no em dash appears anywhere. Green does not
 is correct. Only reading the source does that.
 
 Full guidance in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+## Credits
+
+Written and maintained by **Kyle (fobiat)**.
+
+- Website: [fobiat.dev](https://fobiat.dev/)
+- GitHub: [github.com/fobiat](https://github.com/fobiat)
+- Email: kyle@fobiat.dev
+
+Both halves of this repository are his work: the skill in `skills/sbox/`, and the `sbox_dev`
+editor MCP toolset in `editor-mcp/`.
+
+The field notes deserve a specific credit of their own. They are not compiled from
+documentation. Every row in them came out of a real editor session where something did not
+behave the way the API said it would, and somebody sat there and worked out why. That is the
+part of this repository you cannot generate.
+
+Thanks to Facepunch Studios for publishing the engine's managed layer under a licence that
+makes a reference like this possible to write and to share.
 
 ---
 

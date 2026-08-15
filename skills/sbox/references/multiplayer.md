@@ -10,29 +10,29 @@
             which is MIT licensed. See LICENSE at the repository root.
 -->
 
-# Networking
+# Multiplayer
 
-RPCs, [Sync] properties, ownership, authority, host vs client, replication, lobbies, and dedicated servers. Everything here was read out of the engine source at version **26.08.05** (`sbox-public`), with a handful of claims cross-checked live and cited inline as ledger rows.
+This page maps RPCs, [Sync] state, ownership and authority, host versus client behavior, replication, lobbies, and dedicated-server setup. Every claim below was pulled from the **26.08.05** engine source (`sbox-public`); a few of the trickier ones were also verified live, and those are marked inline against ledger rows.
 
----
+***
 
 ## Overview
 
-s&box networking is **intentionally simple**: owner-authoritative by default. The owner of a networked object controls its position, rotation, and its [Sync] properties. If nobody owns an object, the host simulates it instead.
+The networking model in s&box stays deliberately simple: whoever owns a networked object is authoritative for it by default, driving its position, rotation, and its [Sync] properties. An object with no owner falls back to the host, which simulates it in the owner's place.
 
-Five terms come up constantly enough to pin down before anything else:
+Five words recur throughout this document, worth nailing down before anything else:
 
-- **Host**: the computer running the game (a singleplayer player, a lobby host, or a dedicated server).
-- **Client**: a connected player who is not the host.
-- **Owner**: the connection that simulates a networked object.
-- **Proxy**: a networked object you don't own (`IsProxy == true`).
-- **NetworkMode**: how a GameObject participates in networking.
+- **Host**: whichever machine is actually running the game world, be that a singleplayer session, a lobby host, or a dedicated server.
+- **Client**: any connected player besides the host.
+- **Owner**: whichever connection is responsible for simulating a given networked object.
+- **Proxy**: a networked object that belongs to someone else (`IsProxy == true`).
+- **NetworkMode**: the setting controlling whether and how a GameObject is networked at all.
 
----
+***
 
 ## Lobby & Connection
 
-### Creating a Lobby
+### Standing Up a Lobby
 
 ```csharp
 Networking.CreateLobby( new LobbyConfig
@@ -43,9 +43,9 @@ Networking.CreateLobby( new LobbyConfig
 } );
 ```
 
-`LobbyConfig` properties: `MaxPlayers`, `Privacy` (`Public`/`Private`/`FriendsOnly`), `Name`, `Hidden`, `DestroyWhenHostLeaves`, `AutoSwitchToBestHost`.
+`LobbyConfig` exposes: `MaxPlayers`, `Privacy` (`Public`/`Private`/`FriendsOnly`), `Name`, `Hidden`, `DestroyWhenHostLeaves`, and `AutoSwitchToBestHost`.
 
-### Querying & Joining
+### Finding and Joining a Lobby
 
 ```csharp
 // List all lobbies for this game
@@ -61,9 +61,9 @@ await Networking.JoinBestLobby( gameIdent );
 Networking.Disconnect();
 ```
 
-`LobbyInformation` has: `LobbyId`, `OwnerId`, `Members`, `MaxMembers`, `Name`, `Map`, `Game`, `IsFull`, `IsHidden`.
+`LobbyInformation` carries: `LobbyId`, `OwnerId`, `Members`, `MaxMembers`, `Name`, `Map`, `Game`, `IsFull`, `IsHidden`.
 
-### Connection
+### The Connection Type
 
 ```csharp
 Connection.Local       // your own connection
@@ -72,64 +72,65 @@ Connection.Host        // the host connection
 Connection.Find( id )  // find by Guid
 ```
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `Id` | `Guid` | Unique identifier |
-| `DisplayName` | `string` | Player display name |
-| `SteamId` | `SteamId` | Steam ID |
-| `IsHost` | `bool` | Is this the host |
-| `IsActive` | `bool` | Fully connected |
-| `IsConnecting` | `bool` | Still connecting |
-| `Ping` | `float` | Latency in ms |
-| `CanSpawnObjects` | `bool` | Permission to spawn networked objects (default: true) |
-| `CanRefreshObjects` | `bool` | Permission to refresh owned objects |
+| Property | Type | What it tells you |
+|----------|------|--------------------|
+| `Id` | `Guid` | A stable identifier for the connection |
+| `DisplayName` | `string` | The player's shown name |
+| `SteamId` | `SteamId` | Their Steam ID |
+| `IsHost` | `bool` | Whether this connection is the host |
+| `IsActive` | `bool` | Set once the connection is fully established |
+| `IsConnecting` | `bool` | Set while the connection is still being established |
+| `Ping` | `float` | Round-trip latency, in milliseconds |
+| `CanSpawnObjects` | `bool` | Whether this connection may spawn networked objects (true by default) |
+| `CanRefreshObjects` | `bool` | Whether this connection may refresh objects it owns |
 
-A few methods worth knowing on `Connection`:
-- `Kick( string reason )`, host only.
-- `HasPermission( string permission )` returns `bool`.
-- `Down/Pressed/Released( string action )` queries a remote player's input, host only.
+`Connection` also exposes a few methods worth remembering:
+- `Kick( string reason )`: host-only.
+- `HasPermission( string permission )`: returns a `bool`.
+- `Down/Pressed/Released( string action )`: reads a remote player's input state, host-only.
 
-### Networking Static
+### Global Networking State
 
 | Property | Description |
 |----------|-------------|
-| `Networking.IsHost` | True if you're the host (or not connected) |
-| `Networking.IsClient` | Connected and NOT host |
-| `Networking.IsActive` | Currently connected |
-| `Networking.IsConnecting` | Currently connecting |
-| `Networking.ServerName` | Server name |
-| `Networking.MaxPlayers` | Max players |
+| `Networking.IsHost` | True when you're the host, or when not connected at all |
+| `Networking.IsClient` | True when connected but not the host |
+| `Networking.IsActive` | True while a connection is live |
+| `Networking.IsConnecting` | True while a connection attempt is in progress |
+| `Networking.ServerName` | The server's name |
+| `Networking.MaxPlayers` | The configured player cap |
 
----
+***
 
 ## Networked Objects
 
 ### NetworkMode
 
-Set in the inspector or in code. It determines how a GameObject participates in networking at all.
+Configurable either in the inspector or from code, this setting decides whether a GameObject is networked at all, and how.
 
 | Mode | Behavior |
 |------|----------|
-| `NetworkMode.Never` | Never networked |
-| `NetworkMode.Object` | Own networked object: has owner, [Sync] properties, RPCs |
-| `NetworkMode.Snapshot` **(default)** | Sent as part of initial scene snapshot when client joins |
+| `NetworkMode.Never` | Not networked, period |
+| `NetworkMode.Object` | A full networked object, with an owner, [Sync] properties, and RPCs |
+| `NetworkMode.Snapshot` **(default)** | Included in the initial scene snapshot handed to a joining client |
 
-> **`Snapshot` does not live-replicate `[Sync]`.** This is the default for every object you
-> place in a scene (`GameObject.Network.cs:62`), and it's the quietest bug class in the
-> engine. `[Sync]` properties only get registered into a network table by a `NetworkObject`,
-> and a `NetworkObject` only exists once the object has actually been `NetworkSpawn`ed.
-> Meanwhile **RPCs keep working the whole time**, because instance RPC dispatch resolves its
-> target through `Scene.Directory.FindByGuid` and never consults the network object at all.
-> So your logs look healthy, your RPCs fire, and your state is frozen at its initial value
-> regardless. Verified live: a client read `0` for 62 straight pings while the host was at
-> 117. If a `[Sync]` value looks stale, check `IsNetworkRoot` on the object or an ancestor
-> first, before you go looking anywhere else.
+> **A `Snapshot`-mode object never live-replicates its `[Sync]` state.** Every object dropped
+> into a scene gets this mode by default (`GameObject.Network.cs:62`), which makes it the
+> engine's most easily missed trap. A `[Sync]` property only becomes part of a network table
+> once a `NetworkObject` exists for it, and a `NetworkObject` doesn't exist until the object
+> has gone through `NetworkSpawn`. Yet **RPCs carry on regardless**: instance RPC dispatch
+> looks up its target through `Scene.Directory.FindByGuid` and never touches the network
+> object at all. The result is deceptive: RPCs fire, logs show nothing wrong, and the
+> `[Sync]` value just sits frozen at whatever it started as. Live testing caught this
+> directly, a client stuck reading `0` for 62 consecutive pings while the host had already
+> reached 117. Treat a stale `[Sync]` value as a cue to check `IsNetworkRoot` on the object,
+> or on an ancestor, before looking anywhere else.
 >
-> A `Snapshot` child of a networked root is fine: the root's table walks into it
-> (`NetworkObject.DataTable.cs:47-54`). It's specifically a top-level Snapshot object with no
-> networked ancestor that goes dark.
+> A `Snapshot` object nested under a networked root is unaffected, since the root's table
+> reaches down into it (`NetworkObject.DataTable.cs:47-54`). The failure is specific to a
+> top-level Snapshot object with no networked ancestor above it.
 
-### Spawning on Network
+### Spawning an Object Onto the Network
 
 ```csharp
 // Create and network-spawn a prefab
@@ -146,33 +147,35 @@ go.NetworkSpawn( new NetworkSpawnOptions
 } );
 ```
 
-> **The parameterless `NetworkSpawn()` assigns ownership to `Connection.Local`.** Literally:
-> `NetworkSpawn() => NetworkSpawn( Connection.Local )` (`GameObject.Network.cs:125`). That
-> means it encodes whoever happens to call it: host-owned when that line runs on the host,
-> client-owned the moment the same code runs client-side. For a host-authoritative world
-> object this is a silent wrong-owner trap. The object spawns, replicates, and then quietly
-> rejects the host's own writes because a client ended up owning it. Always name the owner
-> explicitly: `NetworkSpawn( Connection.Host )` or `NetworkSpawn( connection )`.
+> **Call `NetworkSpawn()` with no arguments and ownership defaults to `Connection.Local`.**
+> The implementation is literally a forward: `NetworkSpawn() => NetworkSpawn( Connection.Local )`
+> (`GameObject.Network.cs:125`). Ownership therefore tracks whoever happens to execute that
+> line, host-owned if it runs on the host, client-owned if the same code path runs on a
+> client. That's a silent trap for anything meant to be host-authoritative: the object
+> spawns fine, replicates fine, and then quietly refuses the host's own writes because
+> ownership landed on a client instead. Name the owner explicitly every time:
+> `NetworkSpawn( Connection.Host )` or `NetworkSpawn( connection )`.
 
-`NetworkSpawn( NetworkSpawnOptions )` (`GameObject.Network.cs:131-181`) is the full form. It
-refuses on a `PrefabScene`, in the editor scene, on an already-spawned object, and when
-`Connection.Local.CanSpawnObjects` is false (that last one also logs a warning). All four
-cases return `false` rather than throwing, so check the return value instead of assuming
-success.
+The full-featured overload, `NetworkSpawn( NetworkSpawnOptions )`
+(`GameObject.Network.cs:131-181`), declines to run in four situations: on a `PrefabScene`, in
+the editor scene, on an object that's already spawned, or when
+`Connection.Local.CanSpawnObjects` is false, and that last case also logs a warning. None of
+the four throw; all four just return `false`, so check the return value rather than assuming
+the call succeeded.
 
-After `NetworkSpawn()`, changes to components or hierarchy are not automatically networked. Call `Network.Refresh()` to push structural changes.
+Structural changes made after `NetworkSpawn()`, adding a component, reparenting, and so on, don't propagate automatically. Push them with `Network.Refresh()`.
 
-### Destroying
+### Tearing an Object Down
 
 ```csharp
 go.Destroy();  // works for networked objects too
 ```
 
----
+***
 
 ## [Sync] Properties
 
-Synced properties automatically carry a value from owner to all clients. Only the owner can change them, unless the property is marked `SyncFlags.FromHost`.
+A synced property's value travels automatically from its owner out to every client. Nobody but the owner can change it, unless the property carries `SyncFlags.FromHost`.
 
 ```csharp
 public sealed class PlayerStats : Component
@@ -185,29 +188,30 @@ public sealed class PlayerStats : Component
 }
 ```
 
-### Supported Types
+### What Can Be Synced
 
-Unmanaged value types (`int`, `bool`, `float`, `Vector3`, `Rotation`, `Transform`, `Color`, `Angles`, etc.), `string`, `GameObject`, `Component`, `GameResource`, and structs composed of supported types.
+The set covers unmanaged value types (`int`, `bool`, `float`, `Vector3`, `Rotation`, `Transform`, `Color`, `Angles`, and similar), plus `string`, `GameObject`, `Component`, `GameResource`, and any struct built entirely from supported types.
 
 ### SyncFlags
 
 | Flag | Effect |
 |------|--------|
-| `SyncFlags.FromHost` | Host controls value instead of object owner |
-| `SyncFlags.Query` | Check for changes each tick (use when backing field modified outside setter) |
-| `SyncFlags.Interpolate` | Smooth interpolation between ticks. Works with: `float`, `double`, `Angles`, `Rotation`, `Transform`, `Vector3` |
+| `SyncFlags.FromHost` | Value is controlled by the host rather than the object's owner |
+| `SyncFlags.Query` | Polls for changes every tick; needed when the backing field is written outside its setter |
+| `SyncFlags.Interpolate` | Interpolates smoothly between ticks; supported for `float`, `double`, `Angles`, `Rotation`, `Transform`, `Vector3` |
 
-> **A write you aren't allowed to make is discarded silently, before the backing field is
-> ever touched.** The generated setter checks `dataTable.HasControl( slot )` and `return`s
-> before invoking the real setter (`Component.Network.cs:64-68`). No exception, no warning,
-> and the very next read already returns the authoritative value, so the failure doesn't even
-> look like a revert: it looks like the write never happened. Under `FromHost` the control
-> predicate is literally `c => c.IsHost` (`NetworkObject.DataTable.cs:75`), which bypasses
-> ownership entirely: a client that owns the object still cannot write a `FromHost` property.
-> Verified live twice (ledger FN-1). If a client needs to change host state, send an
-> `[Rpc.Host]` and validate the change there instead.
+> **An unauthorized write vanishes silently before it ever reaches the backing field.**
+> The generated setter checks `dataTable.HasControl( slot )` first and simply `return`s if
+> that fails, never touching the real setter (`Component.Network.cs:64-68`). There's no
+> exception and no warning, and because the very next read already returns the authoritative
+> value, the failure doesn't present as a revert, it looks exactly like the write never
+> happened at all. Under `FromHost` the control check is literally `c => c.IsHost`
+> (`NetworkObject.DataTable.cs:75`), which overrides ownership entirely: even a client that
+> owns the object can't write to a `FromHost` property. Confirmed live on two separate
+> occasions (ledger FN-1). A client that needs host state changed should send an
+> `[Rpc.Host]` call and let the host validate and apply it.
 
-### Change Detection
+### Reacting to Changes
 
 ```csharp
 [Sync, Change( "OnHealthChanged" )]
@@ -219,16 +223,16 @@ void OnHealthChanged( float oldValue, float newValue )
 }
 ```
 
-### Networked Collections
+### Syncing Lists and Dictionaries
 
 ```csharp
 [Sync] public NetList<int> Inventory { get; set; } = new();
 [Sync] public NetDictionary<string, int> AmmoCount { get; set; } = new();
 ```
 
-`NetList<T>` and `NetDictionary<K,V>` work like their standard counterparts (`Add`, `Remove`, indexers, and so on), and only the delta is sent over the wire, never the whole collection. Neither supports `[Property]`.
+`NetList<T>` and `NetDictionary<K,V>` behave like the ordinary collections they mirror, `Add`, `Remove`, indexers, and the rest, but only the delta crosses the wire, never a full copy of the collection. Neither one supports `[Property]`.
 
-Four rules govern them, and all four fail silently if you get them wrong.
+Four rules apply to both, and every one of them fails quietly if broken.
 
 **1. Change notification is a field, not `[Change]`.**
 
@@ -241,38 +245,40 @@ protected override void OnStart()
 }
 ```
 
-`OnChanged` is a public `Action<NetListChangeEvent<T>>` field on the collection
-(`Containers/NetList.cs:56`; `NetDictionary` has the equivalent). **`[Change]` will not work
-here.** It's a `WrapPropertySet` code generator (`ChangeAttribute.cs`), so it only fires when
-the whole list object is reassigned, never when an element is added, removed, or replaced.
-`NetListChangeEvent<T>` carries `Type` (a `NotifyCollectionChangedAction`), `Index`,
-`MovedIndex`, `NewValue`, `OldValue` (`NetList.cs:11-18`).
+The collection exposes `OnChanged` as a plain public `Action<NetListChangeEvent<T>>` field
+(`Containers/NetList.cs:56`; `NetDictionary` mirrors it). **`[Change]` does nothing here.**
+It's implemented as a `WrapPropertySet` code generator (`ChangeAttribute.cs`), which only
+triggers when the whole list gets reassigned, not when a single element is added, removed, or
+replaced. `NetListChangeEvent<T>` itself carries `Type` (a `NotifyCollectionChangedAction`),
+`Index`, `MovedIndex`, `NewValue`, and `OldValue` (`NetList.cs:11-18`).
 
-**2. Initialize once in the property initializer; never reassign after spawn.** The
-collection is wired to its network table entry by a one-shot
-`INetworkProperty.Init( slot, parent )`, guarded by `if ( !entry.Initialized )`
-(`NetworkTable.cs:170-174`). Assign a fresh `new()` after the object is spawned and the
-replacement never gets a `Parent`, which also means it loses its proxy protection (rule 3)
-and will accept writes it should be rejecting. To empty a list, call `Clear()` instead of
-replacing it.
+**2. Set it up once, in the property initializer, and leave it alone after spawn.** A
+one-shot call, `INetworkProperty.Init( slot, parent )`, guarded by
+`if ( !entry.Initialized )` (`NetworkTable.cs:170-174`), is what wires the collection to its
+network table entry. Assign a new `new()` after spawn and the replacement never picks up a
+`Parent`, so it also loses the proxy protection described in rule 3 and starts accepting
+writes it ought to reject. Clearing a list means calling `Clear()`, not replacing it outright.
 
-**3. Mutations are silently dropped on non-controllers.** Every mutating method is guarded
-by `CanWriteChanges()`, which resolves to `!Parent?.IsProxy ?? true` (`NetList.cs:470`).
-`Add`/`AddRange`/`Insert`/`Clear`/`RemoveAt`/`this[i] = v` all `return` early on failure
-(`NetList.cs:144-249`), and `Remove` returns `false`. No exception, no log line. Under
-`SyncFlags.FromHost`, "controller" means the host specifically, since the entry's control
-predicate is `c => isHostSync ? c.IsHost : HasControl( c )` (`NetworkObject.DataTable.cs:75`),
-so every client mutation is a no-op there. Route client intent through an `[Rpc.Host]`
-instead of mutating directly.
+**3. Anyone who isn't the controller has their mutations dropped without a sound.** Every
+mutating method checks `CanWriteChanges()` first, which resolves to
+`!Parent?.IsProxy ?? true` (`NetList.cs:470`). On failure, `Add`, `AddRange`, `Insert`,
+`Clear`, `RemoveAt`, and `this[i] = v` all just `return` early (`NetList.cs:144-249`), and
+`Remove` returns `false`. Neither an exception nor a log line follows. With
+`SyncFlags.FromHost`, "controller" narrows to the host specifically, since the entry's
+control predicate is `c => isHostSync ? c.IsHost : HasControl( c )`
+(`NetworkObject.DataTable.cs:75`), meaning every mutation attempted by a client is a silent
+no-op there too. Send client intent through an `[Rpc.Host]` rather than mutating the
+collection directly.
 
-**4. Struct elements may hold references, including `GameResource`, `GameObject`, and
-`Component`.** Elements go through `Game.TypeLibrary.ToBytes`/`FromBytes`
-(`NetList.cs:459-468`). A struct whose fields are all primitives (a `Guid` qualifies) is
-written as raw POD; a struct holding a reference is not (`SandboxedUnsafe.IsAcceptablePod`
-recurses over fields, `:12-23` and `:55-67`), so it falls to a reflection packer that
-serialises each field in turn (`TypeLibrary/Serializer.cs:63-88`), and each reference field
-that implements `BytePack.ISerializer` writes a compact handle: a 64-bit path hash for a
-`Resource` (`Resource.cs:171-193`), a guid for a `GameObject` or `Component`.
+**4. A struct element is free to hold references, `GameResource`, `GameObject`, and
+`Component` included.** Elements pass through `Game.TypeLibrary.ToBytes`/`FromBytes`
+(`NetList.cs:459-468`). One made entirely of primitives (a `Guid` still counts) gets written
+as raw POD; one holding a reference doesn't (`SandboxedUnsafe.IsAcceptablePod` walks its
+fields recursively, `:12-23` and `:55-67`), so it drops to a reflection-based packer that
+serializes each field individually (`TypeLibrary/Serializer.cs:63-88`), and any reference
+field implementing `BytePack.ISerializer` writes a compact handle in its place, a 64-bit
+path hash for a `Resource` (`Resource.cs:171-193`), or a guid for a `GameObject` or
+`Component`.
 
 ```csharp
 public struct ItemEntry              // legal as a NetList<T> element
@@ -283,20 +289,21 @@ public struct ItemEntry              // legal as a NetList<T> element
 }
 ```
 
-Verified live (ledger FN-2, 2026-08-07): three seeded entries of exactly this shape
-replicated to a second client with matching Guids, correctly resolved resource references,
-and a deliberately-null reference stayed faithfully null. Reference fields of a class type
-need a public parameterless constructor and public settable properties; cycles throw.
+Live verification (ledger FN-2, 2026-08-07) confirmed it: three seeded entries built to
+this exact shape replicated cleanly to a second client, Guids matched, resource references
+resolved correctly, and a reference deliberately left null stayed null on the other end.
+Class-type reference fields need a public parameterless constructor and public settable
+properties to work at all; a cycle among them throws.
 
----
+***
 
 ## RPC Messages
 
-A Remote Procedure Call is a method that, when called, also executes on remote machines. RPCs can live on Components or on static classes.
+Calling an RPC method runs it on remote machines too, not just locally. They can be declared on Components or on static classes.
 
 ### [Rpc.Broadcast]
 
-Called on ALL clients and host:
+Runs on every client and the host alike:
 
 ```csharp
 [Rpc.Broadcast]
@@ -310,7 +317,7 @@ public void PlayHitEffect( Vector3 position, Vector3 normal )
 
 ### [Rpc.Host]
 
-Called on the **host only**:
+Executes on the **host**, and nowhere else:
 
 ```csharp
 [Rpc.Host]
@@ -324,7 +331,7 @@ public void RequestSpawn()
 
 ### [Rpc.Owner]
 
-Called on the **owner** of the object (or host if no owner):
+Executes on whichever connection **owns** the object, falling back to the host if there's no owner:
 
 ```csharp
 [Rpc.Owner]
@@ -335,7 +342,7 @@ public void NotifyHit( float damage )
 }
 ```
 
-### Static RPCs
+### RPCs on Static Methods
 
 ```csharp
 [Rpc.Broadcast]
@@ -347,7 +354,7 @@ public static void AnnounceMessage( string message )
 
 ### NetFlags
 
-Pass flags to control delivery:
+Flags passed alongside the attribute tune how the call is delivered:
 
 ```csharp
 [Rpc.Broadcast( NetFlags.Unreliable )]
@@ -359,16 +366,16 @@ public void DealDamage( float amount ) { }
 
 | Flag | Description |
 |------|-------------|
-| `NetFlags.Reliable` | **Default.** Guaranteed delivery. For important events. |
-| `NetFlags.Unreliable` | May not arrive, may be out of order. Fast/cheap. For effects, position updates. |
-| `NetFlags.SendImmediate` | Not batched, sent right away. For voice streaming. |
-| `NetFlags.DiscardOnDelay` | Drop if can't send quickly. Unreliable only. |
-| `NetFlags.HostOnly` | Only host may call this RPC. |
-| `NetFlags.OwnerOnly` | Only owner of the object may call this RPC. |
+| `NetFlags.Reliable` | **Default.** Delivery is guaranteed; use it for anything that matters. |
+| `NetFlags.Unreliable` | Cheap and fast, but may arrive late, out of order, or not at all. Good for effects and position updates. |
+| `NetFlags.SendImmediate` | Skips batching and goes out immediately. Meant for voice streaming. |
+| `NetFlags.DiscardOnDelay` | Dropped rather than delayed if it can't send promptly. Unreliable only. |
+| `NetFlags.HostOnly` | Restricts the call to the host. |
+| `NetFlags.OwnerOnly` | Restricts the call to the object's owner. |
 
-### Filtering Recipients
+### Narrowing Who Receives It
 
-Filter which connections receive a Broadcast RPC:
+Trim which connections actually receive a Broadcast RPC:
 
 ```csharp
 // Exclude specific connections
@@ -384,9 +391,9 @@ using ( Rpc.FilterInclude( targetConnection ) )
 }
 ```
 
-### Caller Information
+### Identifying the Caller
 
-Inside an RPC, check who called it:
+From inside an RPC body, you can inspect who made the call:
 
 ```csharp
 [Rpc.Broadcast]
@@ -399,28 +406,28 @@ public void SendChatMessage( string message )
 }
 ```
 
-`Rpc.Caller` returns the calling `Connection`. `Rpc.CallerId` returns their `Guid`. `Rpc.Calling` is `true` when the method was invoked remotely.
+`Rpc.Caller` gives you the calling `Connection`; `Rpc.CallerId` gives just their `Guid`. `Rpc.Calling` reads `true` whenever the method was triggered remotely.
 
-### Supported Argument Types
+### What Arguments an RPC Can Take
 
-Same as [Sync] properties: unmanaged types, `string`, `GameObject`, `Component`, `GameResource`.
+The same set as [Sync] properties: unmanaged types, `string`, `GameObject`, `Component`, `GameResource`.
 
----
+***
 
 ## Ownership
 
-### Who Controls What
+### Determining the Controller
 
 | Situation | Controller |
 |-----------|-----------|
-| Scene object (no explicit owner) | Host |
-| `NetworkSpawn()` by a client | That client becomes owner |
-| `NetworkSpawn( connection )` | Specified connection |
-| Owner disconnects | Depends on `NetworkOrphaned` mode |
+| A scene object with no owner named explicitly | Host |
+| `NetworkSpawn()` by a client | That calling client becomes the owner |
+| `NetworkSpawn( connection )` | Whichever connection was named |
+| Owner disconnects | Determined by the `NetworkOrphaned` mode in effect |
 
-### The IsProxy Pattern
+### Checking IsProxy Before You Simulate
 
-The single most important ownership check: skip simulation for objects you don't own.
+This is the one ownership check that matters most: bail out of simulation for anything you don't own.
 
 ```csharp
 protected override void OnUpdate()
@@ -432,7 +439,7 @@ protected override void OnUpdate()
 }
 ```
 
-### Ownership Transfer
+### Transferring Ownership
 
 ```csharp
 go.Network.TakeOwnership();                // become the owner
@@ -442,7 +449,7 @@ go.Network.AssignOwnership( connection );  // give to specific client (host only
 
 ### OwnerTransfer Mode
 
-Controls who can change ownership:
+Governs who's allowed to change ownership at all:
 
 ```csharp
 go.Network.SetOwnerTransfer( OwnerTransfer.Takeover );
@@ -450,13 +457,13 @@ go.Network.SetOwnerTransfer( OwnerTransfer.Takeover );
 
 | Mode | Who Can Transfer |
 |------|------------------|
-| `OwnerTransfer.Fixed` **(default)** | Host only |
-| `OwnerTransfer.Takeover` | Anyone |
-| `OwnerTransfer.Request` | Must request from host |
+| `OwnerTransfer.Fixed` **(default)** | Restricted to the host |
+| `OwnerTransfer.Takeover` | Open to anyone |
+| `OwnerTransfer.Request` | Requires asking the host first |
 
-### Orphaned Mode (Disconnect Handling)
+### Handling a Disconnected Owner
 
-What happens when the owner disconnects:
+Determines the fallback the moment an owner drops off:
 
 ```csharp
 go.Network.SetOrphanedMode( NetworkOrphaned.Host );
@@ -464,34 +471,34 @@ go.Network.SetOrphanedMode( NetworkOrphaned.Host );
 
 | Mode | Behavior |
 |------|----------|
-| `NetworkOrphaned.Destroy` **(default)** | Object destroyed |
-| `NetworkOrphaned.Host` | Host becomes owner |
-| `NetworkOrphaned.Random` | Random client becomes owner |
-| `NetworkOrphaned.ClearOwner` | No owner, host simulates |
+| `NetworkOrphaned.Destroy` **(default)** | The object is destroyed |
+| `NetworkOrphaned.Host` | Ownership passes to the host |
+| `NetworkOrphaned.Random` | Ownership passes to a random client |
+| `NetworkOrphaned.ClearOwner` | Ownership clears and the host simulates it instead |
 
 ### Network Accessor (go.Network)
 
 | Property | Type | Description |
 |----------|------|-------------|
-| `Active` | `bool` | Is this object networked |
-| `IsOwner` | `bool` | Are we the owner |
-| `Owner` | `Connection` | Owner connection (null if none) |
-| `OwnerId` | `Guid` | Owner's connection ID |
-| `IsProxy` | `bool` | Controlled by someone else |
-| `IsCreator` | `bool` | Did we create this object |
-| `OwnerTransfer` | `OwnerTransfer` | Who can transfer ownership |
-| `NetworkOrphaned` | `NetworkOrphaned` | Disconnect behavior |
-| `AlwaysTransmit` | `bool` | Always send updates (default: true) |
-| `Interpolation` | `bool` | Smooth transform interpolation |
-| `Flags` | `NetworkFlags` | Additional flags |
+| `Active` | `bool` | Whether this object is networked at all |
+| `IsOwner` | `bool` | Whether we're the owner |
+| `Owner` | `Connection` | The owning connection, or null if there isn't one |
+| `OwnerId` | `Guid` | The owner's connection identifier |
+| `IsProxy` | `bool` | Whether someone else controls it |
+| `IsCreator` | `bool` | Whether we're the one who created this object |
+| `OwnerTransfer` | `OwnerTransfer` | Who is permitted to transfer ownership |
+| `NetworkOrphaned` | `NetworkOrphaned` | The configured disconnect behavior |
+| `AlwaysTransmit` | `bool` | Whether updates always send, regardless of visibility (true by default) |
+| `Interpolation` | `bool` | Whether transform interpolation is smoothed |
+| `Flags` | `NetworkFlags` | Any additional flags set |
 
-A few methods worth knowing:
-- `TakeOwnership()` returns `bool`.
-- `AssignOwnership( Connection )` returns `bool`.
-- `DropOwnership()` returns `bool`.
-- `Refresh()` pushes structural changes to clients.
-- `Refresh( Component )` refreshes a specific component.
-- `ClearInterpolation()` snaps to position (teleport).
+Worth knowing on the same accessor:
+- `TakeOwnership()`: returns `bool`.
+- `AssignOwnership( Connection )`: returns `bool`.
+- `DropOwnership()`: returns `bool`.
+- `Refresh()`: pushes structural changes out to clients.
+- `Refresh( Component )`: refreshes just the one component.
+- `ClearInterpolation()`: snaps straight to position, for teleporting.
 - `SetOwnerTransfer( OwnerTransfer )`
 - `SetOrphanedMode( NetworkOrphaned )`
 
@@ -499,36 +506,36 @@ A few methods worth knowing:
 
 | Flag | Effect |
 |------|--------|
-| `NetworkFlags.NoInterpolation` | Disable transform interpolation |
-| `NetworkFlags.NoPositionSync` | Don't sync position |
-| `NetworkFlags.NoRotationSync` | Don't sync rotation |
-| `NetworkFlags.NoScaleSync` | Don't sync scale |
-| `NetworkFlags.NoTransformSync` | Don't sync any transform |
+| `NetworkFlags.NoInterpolation` | Turns off transform interpolation |
+| `NetworkFlags.NoPositionSync` | Leaves position out of sync |
+| `NetworkFlags.NoRotationSync` | Leaves rotation out of sync |
+| `NetworkFlags.NoScaleSync` | Leaves scale out of sync |
+| `NetworkFlags.NoTransformSync` | Excludes the transform entirely |
 
----
+***
 
-## Transform Interpolation
+## Smoothing Networked Movement
 
-Networked transforms are interpolated smoothly by default. To teleport, clear the interpolation explicitly, otherwise the object visibly slides to its new position on every other client:
+By default, a networked transform interpolates smoothly between updates. Teleporting requires clearing that interpolation explicitly, or the object will visibly slide into its new position on every other client:
 
 ```csharp
 WorldPosition = newPosition;
 Network.ClearInterpolation();  // snap immediately for all clients
 ```
 
-To disable interpolation entirely:
+To turn interpolation off altogether:
 
 ```csharp
 go.Network.Interpolation = false;
 ```
 
----
+***
 
 ## Network Events
 
 ### INetworkListener (Host Only)
 
-React to player connections and disconnections. Implement it on a Component in the scene.
+This is how you respond to players joining and leaving. Implement it on any Component sitting in the scene.
 
 ```csharp
 public sealed class GameManager : Component, Component.INetworkListener
@@ -561,15 +568,15 @@ public sealed class GameManager : Component, Component.INetworkListener
 
 | Method | When Called |
 |--------|-----------|
-| `AcceptConnection( Connection, ref string reason )` | On host, to accept/deny. Return false to reject. |
-| `OnConnected( Connection )` | Client connected (still loading) |
-| `OnActive( Connection )` | Client fully loaded, entering game |
-| `OnDisconnected( Connection )` | Client left |
-| `OnBecameHost( Connection previousHost )` | You are now the host (previous host left) |
+| `AcceptConnection( Connection, ref string reason )` | Runs on the host to accept or deny a connection; return false to reject it |
+| `OnConnected( Connection )` | Fires once the client connects, while it's still loading |
+| `OnActive( Connection )` | Fires once the client has fully loaded and is entering the game |
+| `OnDisconnected( Connection )` | Fires when the client leaves |
+| `OnBecameHost( Connection previousHost )` | Fires when you've just become host because the previous one left |
 
 ### INetworkSpawn
 
-Called when an ancestor `GameObject` is network-spawned:
+Fires whenever an ancestor `GameObject` gets network-spawned:
 
 ```csharp
 public sealed class WeaponSetup : Component, Component.INetworkSpawn
@@ -583,7 +590,7 @@ public sealed class WeaponSetup : Component, Component.INetworkSpawn
 
 ### IGameObjectNetworkEvents
 
-Ownership change events, targeted at the specific GameObject:
+Delivers ownership-change events scoped to one specific GameObject:
 
 ```csharp
 public sealed class OwnerTracker : Component, IGameObjectNetworkEvents
@@ -596,7 +603,7 @@ public sealed class OwnerTracker : Component, IGameObjectNetworkEvents
 
 ### INetworkSnapshot (Custom Snapshot Data)
 
-Send custom data (voxels, world state) to joining clients:
+Use this to hand custom data, voxel data, world state, whatever, to a client as it joins:
 
 ```csharp
 public sealed class VoxelWorld : Component, Component.INetworkSnapshot
@@ -617,11 +624,11 @@ public sealed class VoxelWorld : Component, Component.INetworkSnapshot
 }
 ```
 
----
+***
 
-## Network Visibility
+## Culling What Gets Sent
 
-By default, every networked object transmits to every connection. For larger games, disable `AlwaysTransmit` and implement `INetworkVisible` instead:
+Every networked object transmits to every connection by default. Bigger games should turn off `AlwaysTransmit` and implement `INetworkVisible` in its place:
 
 ```csharp
 public sealed class DistanceCulling : Component, Component.INetworkVisible
@@ -633,15 +640,15 @@ public sealed class DistanceCulling : Component, Component.INetworkVisible
 }
 ```
 
-When an object is culled, its sync vars and transform stop updating, but it still exists on the client, just disabled. RPCs still deliver regardless.
+Culling an object stops its sync vars and transform from updating, though the object itself remains present on the client, just disabled. RPCs keep arriving regardless.
 
-Hammer maps with VIS compiled use PVS automatically as a fallback.
+A Hammer map with VIS compiled falls back to PVS automatically.
 
----
+***
 
-## NetworkHelper Component
+## The NetworkHelper Shortcut
 
-A ready-made component for simple multiplayer setup:
+A ready-made component that covers basic multiplayer setup with no custom code:
 
 ```csharp
 // Add to a GameObject in your scene
@@ -652,17 +659,17 @@ A ready-made component for simple multiplayer setup:
 
 | Property | Description |
 |----------|-------------|
-| `StartServer` | Auto-create lobby on scene load |
-| `PlayerPrefab` | Prefab spawned for each player |
-| `SpawnPoints` | List of spawn locations (random selection) |
+| `StartServer` | Creates a lobby automatically when the scene loads |
+| `PlayerPrefab` | The prefab spawned for each connecting player |
+| `SpawnPoints` | A list of spawn locations, chosen from at random |
 
-Internally it uses `INetworkListener.OnActive` to spawn and assign player prefabs, so it doubles as a reference if you end up rolling your own version.
+Under the hood it spawns and assigns player prefabs through `INetworkListener.OnActive`, which makes it a decent reference if you end up writing your own version.
 
----
+***
 
 ## Scene Startup (ISceneStartup)
 
-For game initialization on host. Best implemented on a `GameObjectSystem`:
+This is where host-side game initialization belongs, and it's best implemented on a `GameObjectSystem`:
 
 ```csharp
 public sealed class GameManager : GameObjectSystem<GameManager>, ISceneStartup
@@ -688,13 +695,13 @@ public sealed class GameManager : GameObjectSystem<GameManager>, ISceneStartup
 }
 ```
 
----
+***
 
 ## Dedicated Servers
 
-### Server-Side Code
+### Code That Only Exists on the Server
 
-Use `#if SERVER` blocks or `.Server.cs` file naming for host-only code, which gets stripped from published client builds entirely:
+Host-only code belongs behind `#if SERVER` blocks, or in a file named with the `.Server.cs` suffix; either way it's stripped out of published client builds entirely:
 
 ```csharp
 #if SERVER
@@ -705,9 +712,9 @@ public void AdminCommand()
 #endif
 ```
 
-### User Permissions
+### Configuring User Permissions
 
-Configure via `users/config.json`:
+Set these up through `users/config.json`:
 
 ```json
 {
@@ -720,13 +727,13 @@ Configure via `users/config.json`:
 }
 ```
 
-Check with `connection.HasPermission( "admin" )`.
+Test for one with `connection.HasPermission( "admin" )`.
 
----
+***
 
-## Common Patterns
+## Patterns Worth Copying
 
-### Player Controller with Networking
+### A Networked Player Controller
 
 ```csharp
 public sealed class MyPlayer : Component, Component.INetworkSpawn
@@ -765,21 +772,21 @@ public sealed class MyPlayer : Component, Component.INetworkSpawn
 }
 ```
 
-### Quick Reference
+### Cheat Sheet
 
 | Task | Code |
 |------|------|
-| Check if host | `Networking.IsHost` |
-| Check if proxy | `IsProxy` (on Component/GameObject) |
-| Get all connections | `Connection.All` |
-| Get local connection | `Connection.Local` |
-| Get host connection | `Connection.Host` |
-| Spawn networked object, host-owned | `go.NetworkSpawn( Connection.Host )` |
-| Spawn for specific player | `go.NetworkSpawn( connection )` |
-| Take ownership | `go.Network.TakeOwnership()` |
-| Drop ownership | `go.Network.DropOwnership()` |
-| Check if networked | `go.Network.Active` |
-| Teleport (no lerp) | `WorldPos = x; Network.ClearInterpolation()` |
-| Push structural changes | `go.Network.Refresh()` |
-| Create lobby | `Networking.CreateLobby( config )` |
-| Disconnect | `Networking.Disconnect()` |
+| Am I the host? | `Networking.IsHost` |
+| Am I a proxy? (on Component/GameObject) | `IsProxy` |
+| All connected players | `Connection.All` |
+| My own connection | `Connection.Local` |
+| The host's connection | `Connection.Host` |
+| Spawn a networked object owned by the host | `go.NetworkSpawn( Connection.Host )` |
+| Spawn a networked object for a specific player | `go.NetworkSpawn( connection )` |
+| Take ownership of an object | `go.Network.TakeOwnership()` |
+| Give up ownership | `go.Network.DropOwnership()` |
+| Is this object networked? | `go.Network.Active` |
+| Teleport without a visible slide | `WorldPos = x; Network.ClearInterpolation()` |
+| Push structural changes to clients | `go.Network.Refresh()` |
+| Create a lobby | `Networking.CreateLobby( config )` |
+| Disconnect from the game | `Networking.Disconnect()` |

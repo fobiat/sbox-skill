@@ -18,9 +18,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   and language files.
 
 - Node graph and VR/voice-chat references.
-- `sbox_dev` editor MCP toolset (`editor-mcp/SboxDevTools.cs`): `project_info`,
-  `project_compilers`, `project_compile_errors`, `project_reload_config`,
-  `project_rebuild`, `project_build`.
+- `sbox_dev` editor MCP toolset (`editor-mcp/SboxDevTools.cs`), nine tools:
+  `project_info`, `project_compilers`, `project_source_changes`, `project_compile_errors`,
+  `project_input_actions`, `project_reload_config`, `project_reload_settings`,
+  `project_rebuild`, `project_build`. Read-only tools carry `McpToolHints.ReadOnly`.
 - `tools/check_skill.py` gates routing pointers, unrouted files, frontmatter and em dashes.
 - `tools/stamp_headers.py` writes the authorship and provenance header into every skill file.
 

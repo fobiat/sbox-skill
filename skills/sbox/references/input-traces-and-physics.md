@@ -10,7 +10,7 @@
             which is MIT licensed. See LICENSE at the repository root.
 -->
 
-# Input & Physics
+# Input, Traces and Physics
 
 Covers the `Input` static class, `SceneTrace`, the physics world, collision and trigger
 handling, the math types, and time utilities, all read directly out of the s&box engine
@@ -39,7 +39,7 @@ protected override void OnUpdate()
 ```
 
 | Call | What it does |
-|--------|-------------|
+|:---|:---|
 | `Input.Down( string action )` | True for every frame the action is held |
 | `Input.Pressed( string action )` | True only on the frame it goes from up to down |
 | `Input.Released( string action )` | True only on the frame it goes from down to up |
@@ -65,7 +65,7 @@ Engine behaviour with no C# entry point of its own lives in three JSON files und
 wrapped in a `__guid` / `__schema` / `__type` / `__version` envelope.
 
 | File | Backing type | What it controls |
-|---|---|---|
+|:---|:---|:---|
 | `Input.config` | `InputSettings` | The `Actions` list, meaning every action name and its default bind |
 | `Platform.config` | `PlatformSettings` | The built-in text chat and subtitle overlays |
 | `Collision.config` | `CollisionRules` | The tag-vs-tag collision matrix |
@@ -84,8 +84,8 @@ list. Out of the box there are 31 actions spread across four groups, `Movement`,
 your own, because these are the defaults it will collide with otherwise (stock values
 from `Systems/Input/Input.Common.cs:14-58`):
 
-| Action | Key | Note |
-|---|---|---|
+| Action | Default Key | Note |
+|:---|:---|:---|
 | `Use` | `e` | Drives `PlayerController.UseButton`, the button behind `IPressable` |
 | `Score` | `tab` | Takes the key you would probably have reached for on a scoreboard |
 | `Chat` | `enter` | Stays bound even when your gamemode ships a replacement chat |
@@ -151,7 +151,7 @@ Angles lookDir = Input.AnalogLook;     // mouse delta or right stick (scaled by 
 ```
 
 | Property | Type | What it holds |
-|----------|------|-------------|
+|:---|:---|:---|
 | `AnalogMove` | `Vector3` | Move input from the keyboard or left stick |
 | `AnalogLook` | `Angles` | Look input from the mouse or right stick, already sensitivity-scaled |
 | `MouseDelta` | `Vector2` | Raw, unscaled mouse movement for the frame |
@@ -253,7 +253,7 @@ var tr = Scene.Trace.Ray( start, end )
 **Choosing a shape:**
 
 | Method | What it does |
-|--------|-------------|
+|:---|:---|
 | `Ray( Vector3 from, Vector3 to )` | A straight line trace |
 | `Ray( Ray ray, float distance )` | A line trace built from an existing `Ray` |
 | `Sphere( float radius, Vector3 from, Vector3 to )` | Sweeps a sphere |
@@ -266,7 +266,7 @@ var tr = Scene.Trace.Ray( start, end )
 **Narrowing what can be hit:**
 
 | Method | What it does |
-|--------|-------------|
+|:---|:---|
 | `WithTag( string tag )` | Requires this tag; stack calls to AND them together |
 | `WithAllTags( params string[] tags )` | Requires every tag listed |
 | `WithAnyTags( params string[] tags )` | Requires at least one of the listed tags |
@@ -282,21 +282,21 @@ var tr = Scene.Trace.Ray( start, end )
 **Execution flags:**
 
 | Method | What it does |
-|--------|-------------|
+|:---|:---|
 | `UseHitboxes( bool )` | Makes hitbox components eligible to be hit |
 | `UsePhysicsWorld( bool )` | Makes physics objects eligible to be hit (on by default) |
 
 **Running it:**
 
 | Method | Returns | What it does |
-|--------|---------|-------------|
+|:---|:---|:---|
 | `Run()` | `SceneTraceResult` | Returns the first thing hit |
 | `RunAll()` | `IEnumerable<SceneTraceResult>` | Returns every hit along the path |
 
 ### Reading a SceneTraceResult
 
 | Field | Type | What it holds |
-|-------|------|-------------|
+|:---|:---|:---|
 | `Hit` | `bool` | True if anything was hit |
 | `StartPosition` | `Vector3` | Where the trace began |
 | `EndPosition` | `Vector3` | The hit point, or the far end of the trace if nothing was hit |
@@ -334,7 +334,7 @@ Scene.PhysicsWorld.TimeScale = 0.5f;   // slow-mo physics
 ```
 
 | Property | Type | What it does |
-|----------|------|-------------|
+|:---|:---|:---|
 | `Gravity` | `Vector3` | Gravity applied across the whole world |
 | `AirDensity` | `float` | Density used for air drag |
 | `SubSteps` | `int` | Substeps run per physics tick |
@@ -415,7 +415,7 @@ Z-forward, and carrying that assumption over means your "forward" vector is actu
 pointing up, so the first `Rotation.LookAt` call you make sends the camera rolling onto
 its side.
 
-### Vector3
+### Vector3, for Positions and Directions
 
 ```csharp
 // Constants
@@ -453,7 +453,7 @@ Vector3.SmoothDamp( current, target, ref vel, smoothTime, dt )
 float angle = Vector3.GetAngle( dir1, dir2 );
 ```
 
-### Rotation
+### Rotation, a Quaternion Under the Hood
 
 ```csharp
 // Constants
@@ -486,10 +486,9 @@ Rotation.Difference( from, to )                // rotation from A to B
 Rotation.SmoothDamp( current, target, ref vel, smoothTime, dt )
 ```
 
-### Angles
+### Angles, the Euler Form
 
-Represents Euler angles in three parts: `pitch` for up and down, `yaw` for left and
-right, `roll` for tilt.
+Three components: `pitch` for up and down, `yaw` for left and right, `roll` for tilt.
 
 ```csharp
 var angles = new Angles( pitch, yaw, roll );
@@ -500,10 +499,10 @@ Angles.Lerp( from, to, frac )
 angles.WithYaw( 90f )              // replace single component
 ```
 
-### Transform
+### Transform, Position Plus Rotation Plus Scale
 
-Bundles position, rotation and scale together, and is what world/local conversions
-operate on.
+The struct world/local conversions actually operate on: one value carrying all three
+together.
 
 ```csharp
 var tx = new Transform( position, rotation, scale );
@@ -514,7 +513,7 @@ tx.NormalToWorld( localNormal )     // transform a direction
 Transform.Lerp( a, b, frac )       // interpolate all components
 ```
 
-### BBox (Bounding Box)
+### BBox, an Axis-Aligned Bounding Box
 
 ```csharp
 var box = new BBox( mins, maxs );
@@ -527,7 +526,7 @@ BBox.FromHeightAndRadius( h, r )
 BBox.FromPositionAndSize( pos, size )
 ```
 
-### Ray
+### Ray, an Origin Plus a Direction
 
 ```csharp
 var ray = new Ray( origin, direction );
@@ -546,7 +545,7 @@ Time.Delta        // float, frame delta time
 Time.NowDouble    // double precision time
 ```
 
-### TimeSince
+### TimeSince, a Stopwatch That Counts Up
 
 Counts upward starting at zero: assign it `0` to reset the clock, then compare it to a
 number to check how much time has passed.
@@ -566,7 +565,7 @@ protected override void OnUpdate()
 
 It converts implicitly to `float`, giving you the elapsed seconds directly.
 
-### TimeUntil
+### TimeUntil, a Countdown Timer
 
 Counts down toward zero instead: assign it a number of seconds to arm it, and it
 converts implicitly to `bool`, true once the countdown expires.
@@ -619,7 +618,7 @@ var metal = Surface.FindByName( "metal" );
 ```
 
 | Property | Type | What it holds |
-|----------|------|-------------|
+|:---|:---|:---|
 | `Friction` | `float` | How much friction the surface has |
 | `Elasticity` | `float` | How bouncy the surface is |
 | `Density` | `float` | Mass per cubic metre, kg/m^3 |
@@ -645,16 +644,21 @@ protected override void DrawGizmos()
 }
 ```
 
-The draw calls you'll reach for most:
-- `Line( a, b )`, `Arrow( from, to )`
-- `LineSphere( center, radius )`, `SolidSphere( center, radius )`
-- `LineBBox( bbox )`, `SolidBox( bbox )`
-- `LineCapsule( capsule )`, `SolidCapsule( start, end, radius )`
-- `LineCircle( center, radius )`, `SolidCylinder( start, end, radius )`
-- `Model( model, transform )`
-- `WorldText( text, transform )`, `ScreenText( text, position )`
+The pairs below come up constantly, wireframe on the left, filled on the right where one
+exists:
 
-And three properties that affect all of them: `Color`, `IgnoreDepth`, `LineThickness`
+| Wireframe | Filled | Draws |
+|:---|:---|:---|
+| `Line( a, b )` | | A straight segment |
+| `Arrow( from, to )` | | A line with an arrowhead |
+| `LineSphere( center, radius )` | `SolidSphere( center, radius )` | A sphere |
+| `LineBBox( bbox )` | `SolidBox( bbox )` | A box |
+| `LineCapsule( capsule )` | `SolidCapsule( start, end, radius )` | A capsule |
+| `LineCircle( center, radius )` | `SolidCylinder( start, end, radius )` | A flat circle, or a cylinder |
+| | `Model( model, transform )` | A model instance |
+| `WorldText( text, transform )` | `ScreenText( text, position )` | Text anchored in world or screen space |
+
+Three properties shape everything drawn after they're set: `Color`, `IgnoreDepth`, `LineThickness`.
 
 ---
 

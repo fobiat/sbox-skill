@@ -308,3 +308,5 @@ A schema entry proves an API exists. It does not prove it behaves the way you as
 ---
 
 *This file routes. The reference files teach. Do not answer an s&box question from this file alone.*
+
+*s&box skill by Kyle (fobiat), https://fobiat.dev/ and https://github.com/fobiat. MIT licensed. Written against engine 26.08.05 from Facepunch's MIT-licensed managed source.*

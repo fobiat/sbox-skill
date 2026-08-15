@@ -10,29 +10,30 @@
             which is MIT licensed. See LICENSE at the repository root.
 -->
 
-# Patterns & Examples
+# Worked Examples
 
-Complete, idiomatic s&box code, read out of the s&box engine source at version 26.08.05
-and checked against it. Each example below is runnable, not a placeholder fragment. Use
-these as the structural template for your own work: copy one, then trim what you don't
-need rather than building up from nothing.
+Full components, each one pulled from s&box engine source at version 26.08.05 and
+verified against it, not trimmed placeholder fragments. Treat these as the starting
+skeleton for your own systems: grab the closest match, delete what doesn't apply, and
+build outward from something that already compiles.
 
-These examples assume you've read the topical references (`scene-and-components.md`,
-`component-library.md`, `multiplayer.md`, `input-traces-and-physics.md`, `razor-interfaces.md`). They are
-intentionally verbose so there's no guesswork left when you adapt them.
+They lean on the topical references (`scene-and-components.md`, `component-library.md`,
+`multiplayer.md`, `input-traces-and-physics.md`, `razor-interfaces.md`) for the surrounding
+concepts, so read those first. Everything here is spelled out in full rather than
+abbreviated, on purpose, so adapting one doesn't require guessing at the missing half.
 
----
+***
 
-## Conventions Used Here
+## Ground Rules
 
-- Components are `sealed` unless inheritance is needed.
-- `[Property]` exposes state to the inspector and to prefab serialization.
-- `OnFixedUpdate` for movement and physics. `OnUpdate` for camera, input polling, visuals.
-- `Scene.Get<T>()` / `Components.Get<T>()` for scene queries, not `FindObjectOfType`.
-- `if ( IsProxy ) return;` at the top of any networked input/movement update.
-- `Log.Info(...)` / `Log.Warning(...)`, never `Console.WriteLine` or `System.IO`.
+- Every component below is `sealed` unless something further down needs to inherit from it.
+- `[Property]` is what turns a plain field into something the inspector can edit and a prefab can serialize.
+- Movement and physics run in `OnFixedUpdate`; camera work, input polling, and visuals run in `OnUpdate`.
+- Scene queries go through `Scene.Get<T>()` / `Components.Get<T>()`, never `FindObjectOfType`, which doesn't exist here.
+- Any update loop driving networked input or movement opens with `if ( IsProxy ) return;`.
+- Logging goes through `Log.Info(...)` / `Log.Warning(...)`. `Console.WriteLine` and raw `System.IO` are off the table.
 
----
+***
 
 ## Example 1: Health Component with Damage Events
 
@@ -88,15 +89,15 @@ public sealed class Health : Component, Component.IDamageable
 }
 ```
 
-Key points:
-- `[Sync, Change( nameof( OnHealthChanged ) )]` fires the change callback on every client
-  when the owner changes health, proxies included.
-- `IDamageable.OnDamage` takes `in DamageInfo`, a `ref readonly` struct, so calling it
-  doesn't allocate.
-- Only the authoritative side (non-proxy) mutates `Current`. The change event is what
-  replicates the result to everyone else.
-- Scene events (`IHealthEvents.Post`) are local-only. If every client needs to see death
-  effects, drive those from a `[Rpc.Broadcast]` instead.
+Worth flagging:
+- `[Sync, Change( nameof( OnHealthChanged ) )]` triggers its change callback everywhere,
+  proxies included, whenever the owner's health value moves.
+- `in DamageInfo` on `IDamageable.OnDamage` is a `ref readonly` struct parameter, so the
+  call costs nothing extra in allocations.
+- `Current` is only ever written on the authoritative side. Every other client learns the
+  new value through the change callback, not by mutating it themselves.
+- `IHealthEvents.Post` stays local to the machine that raised it. Death effects everyone
+  needs to see belong on a `[Rpc.Broadcast]`, not a scene event.
 
 ---
 
@@ -269,18 +270,19 @@ public sealed class HitscanWeapon : Component
 }
 ```
 
-Key points:
-- Tracing runs only on the shooter (`if ( IsProxy ) return;`), and damage application
-  follows locally from that same trace.
-- The `[Rpc.Broadcast]` runs on **every** client including the shooter, so effects show
-  up everywhere without you having to special-case the local player.
-- `NetFlags.Unreliable` is correct for cosmetic effects: missing a muzzle flash once in a
-  while is fine, and the reliable alternative is needless network spam for something
-  nobody will notice dropped.
-- Effects use `BreakFromPrefab()` so they become standalone GameObjects that self-destruct
-  (assuming the prefab carries a `TemporaryEffect` component).
-- `IgnoreGameObjectHierarchy( GameObject.Root )` stops self-hits even when the weapon is a
-  child several levels deep in the player rig.
+Worth flagging:
+- The trace, and the damage that follows from it, only ever happens on the shooter's
+  machine (`if ( IsProxy ) return;`).
+- `[Rpc.Broadcast]` fires on **every** client, shooter included, which is why the effects
+  don't need a special case for the local player.
+- Cosmetic effects want `NetFlags.Unreliable`: an occasional dropped muzzle flash costs
+  nothing, whereas paying for reliable delivery on something nobody will notice missing
+  is wasted bandwidth.
+- Effects get `BreakFromPrefab()` called on them so they detach into standalone
+  GameObjects that clean themselves up, assuming the prefab carries a `TemporaryEffect`
+  component.
+- `IgnoreGameObjectHierarchy( GameObject.Root )` keeps the weapon from hitting itself even
+  when it's nested several levels deep under the player.
 
 ---
 
@@ -354,18 +356,18 @@ public sealed class GameManager : GameObjectSystem<GameManager>,
 }
 ```
 
-Key points:
-- `GameObjectSystem<GameManager>` is auto-instantiated per scene, so there's no component
-  to drag into the hierarchy.
-- `ISceneStartup.OnHostInitialize()` runs once, on host, after the scene has loaded, which
-  is exactly the window you want for lobby creation.
-- `INetworkListener.OnActive` fires once the connecting client has fully loaded the scene
-  and is ready to receive gameplay, not the moment they connect.
-- `NetworkSpawn( connection )` assigns ownership to that client so they control their own
-  player from the first tick.
-- The `OnDisconnected` sweep matters because `NetworkOrphaned.Destroy` is only the default
-  for **newly** spawned objects. Anything transferred ownership later won't necessarily
-  follow that default, so an explicit sweep is the safe bet.
+Worth flagging:
+- `GameObjectSystem<GameManager>` spins itself up per scene automatically, so there's no
+  GameObject anywhere carrying it.
+- `ISceneStartup.OnHostInitialize()` fires exactly once, on the host, right after the
+  scene finishes loading, the right moment for lobby setup.
+- `INetworkListener.OnActive` doesn't fire the instant a client connects; it waits until
+  they've finished loading the scene and are actually ready for gameplay.
+- Passing `connection` into `NetworkSpawn` hands that client ownership immediately, so
+  they're driving their own player from tick one.
+- The sweep in `OnDisconnected` earns its keep because `NetworkOrphaned.Destroy` only
+  covers objects that were **newly** spawned. Anything that changed hands afterward isn't
+  guaranteed to follow that default, so cleaning up explicitly is the safer bet.
 
 ---
 
@@ -427,19 +429,20 @@ public sealed class Player : Component,
 }
 ```
 
-Key points:
-- `[Sync]` is **owner to everyone** by default. Only the owner can assign it, unless you
-  pass `SyncFlags.FromHost`.
-- `[Rpc.Owner]` delivers to whichever client owns this `GameObject`, which is the shape
-  you want for "tell the victim they got hit."
-- `[Rpc.Broadcast]` runs on all clients plus the host, for cosmetic or shared effects.
-- `[Rpc.Host]` runs only on the host, for authoritative score, economy, or any state
-  change that needs validating before it's trusted.
-- `Scene.Directory.FindByGuid(...)` is how you pass a `GameObject` reference through an
-  RPC without serializing the full reference: cheaper on the wire, and it still resolves
-  correctly for a client who joined after the object was created.
-- `IGameObjectNetworkEvents.NetworkOwnerChanged` fires on every client, so it's the hook
-  for switching first-person / third-person visuals whenever ownership moves.
+Worth flagging:
+- The default direction for `[Sync]` is **owner to everyone**, and only the owner can
+  write to it unless `SyncFlags.FromHost` says otherwise.
+- `[Rpc.Owner]` lands on whichever client owns the `GameObject`, exactly the shape needed
+  for telling a victim they just took a hit.
+- `[Rpc.Broadcast]` reaches every client and the host, suited to cosmetic or shared
+  effects.
+- `[Rpc.Host]` runs on the host alone, which is where score, economy, or anything else
+  that needs validation before being trusted belongs.
+- Rather than serializing a full `GameObject` reference across an RPC, pass its Guid and
+  resolve it on the other end with `Scene.Directory.FindByGuid(...)`. It's cheaper on the
+  wire and still resolves for clients who joined after the object existed.
+- `IGameObjectNetworkEvents.NetworkOwnerChanged` fires for every client, which makes it
+  the hook for flipping between first-person and third-person visuals as ownership moves.
 
 ---
 
@@ -564,16 +567,18 @@ PlayerHud {
 }
 ```
 
-Key points:
-- `BuildHash` is the **only** way to make the Razor tree rebuild cheaply. Include every
-  value your template reads, or a change to something you left out won't show up.
-- `pointer-events: none` on the root lets game input pass through underneath it. Set it
-  to `all` on any interactive sub-panel that needs clicks.
-- `:intro` / `:outro` are s&box-specific transitions that fire when a panel is created or
-  deleted. Paired with `Delete()`, that's animated kill-feed entries with no extra code.
-- `LocalPlayer` gets re-queried every `BuildHash` evaluation, which is fine here because
-  it's a single scene-wide `GetAllComponents` call, O(n) but small. In a large scene,
-  cache the reference in `OnStart` instead.
+Worth flagging:
+- `BuildHash` is the mechanism that keeps the Razor tree rebuild cheap, and it only works
+  if every value the template reads is included in it. Leave one out and a change to it
+  silently fails to show up.
+- `pointer-events: none` on the root panel lets input fall through to the game underneath.
+  Flip individual sub-panels to `all` wherever they need to catch clicks.
+- `:intro` and `:outro` are transitions specific to s&box, firing on panel creation and
+  deletion respectively. Combine them with `Delete()` and the kill-feed animates itself,
+  no extra work required.
+- `LocalPlayer` re-runs its query on every `BuildHash` evaluation. That's fine here since
+  it's a single `GetAllComponents` call across the scene, O(n) but small; a large scene
+  would want that reference cached in `OnStart` instead.
 
 ---
 
@@ -669,19 +674,19 @@ public sealed class Grenade : Component, Component.ICollisionListener
 }
 ```
 
-Key points:
-- `GetOrAddComponent<Rigidbody>()` is safe to call in `OnStart`: it's idempotent, so
-  hot-reloading the script doesn't leave you with a duplicate.
-- `_ = FuseTimer();` kicks off an async countdown without awaiting it. Because
-  `Component.Task` is scoped to the GameObject, destroying the grenade early cancels the
-  await for you, no manual cleanup needed.
-- `Scene.Trace.Sphere( r, origin, origin ).RunAll()` returns every overlapping physics
-  shape for radius damage, cheaper than iterating every component in the scene and doing
-  a distance check on each.
-- `WithAnyTags` is the broad-phase filter here. Filtering by tag rather than type check
-  keeps the grenade from needing to know what a `Player` even is.
-- `falloff = 1 - distance / radius` is a linear falloff. Swap in `MathX.LerpInverse` if
-  you want a different curve.
+Worth flagging:
+- Calling `GetOrAddComponent<Rigidbody>()` from `OnStart` is safe because it's idempotent,
+  so a hot-reload of the script won't leave a second `Rigidbody` behind.
+- `_ = FuseTimer();` fires an async countdown and walks away from it. `Component.Task` is
+  scoped to the GameObject it runs on, so an early-destroyed grenade cancels its own
+  await, nothing extra to clean up.
+- `Scene.Trace.Sphere( r, origin, origin ).RunAll()` hands back every physics shape inside
+  the radius in one call, cheaper than looping every component in the scene and running a
+  distance check on each.
+- The broad-phase filter here is `WithAnyTags`, tag-based rather than type-checked, which
+  is what lets the grenade stay ignorant of what a `Player` actually is.
+- `falloff = 1 - distance / radius` gives a linear curve. Reach for `MathX.LerpInverse`
+  instead if a different falloff shape is wanted.
 
 ---
 
@@ -844,18 +849,18 @@ public sealed class EnemyAi : Component
 }
 ```
 
-Key points:
-- Perception runs at 4 Hz (`_timeSinceDecision > 0.25f`), not on every fixed tick. An
-  enemy doesn't need to reconsider its target 50 times a second, and running perception
-  that often is the first thing that makes enemy count expensive.
-- `Agent.MoveTo` is idempotent, so calling it every tick with the same target costs
-  nothing extra. `Agent.Stop()` before a melee swing still matters though, it's what
-  stops the agent overshooting into the target.
-- `Scene.NavMesh.GetRandomPoint(origin, radius)` returns `Vector3?`, `null` when no
-  NavMesh exists or the point can't be sampled. Falling back to the current position
-  keeps a missing NavMesh from throwing instead of just standing still.
-- `Agent.Velocity.Length` drives the anim graph's move-speed parameter. The same pattern
-  works with `CitizenAnimationHelper.WithVelocity` if you're using the stock rig.
+Worth flagging:
+- Perception ticks at 4 Hz (`_timeSinceDecision > 0.25f`) instead of on every fixed
+  update. Nothing needs an enemy re-evaluating its target fifty times a second, and
+  that's exactly the cost that balloons first as enemy count grows.
+- `Agent.MoveTo` costs nothing extra when called repeatedly with an unchanged target,
+  since it's idempotent. `Agent.Stop()` before a melee swing still earns its place, it's
+  what keeps the agent from overshooting the target.
+- `Scene.NavMesh.GetRandomPoint(origin, radius)` returns a nullable `Vector3?`, coming
+  back `null` when there's no NavMesh or nothing samplable at that point. Falling back to
+  the current position turns a missing NavMesh into standing still rather than a throw.
+- The anim graph's move-speed parameter is driven off `Agent.Velocity.Length`; the same
+  approach carries over to `CitizenAnimationHelper.WithVelocity` for the stock rig.
 
 ---
 
@@ -925,19 +930,20 @@ public sealed class PrefabSpawner : Component
 }
 ```
 
-Key points:
-- `Prefab.Clone(pos, rot)` creates an instance with a live link back to the source
-  prefab, so future edits to the prefab asset propagate to it. Only call
-  `BreakFromPrefab()` if you specifically need to sever that link.
-- `NetworkSpawn()` must only be called on the authority. The `Networking.IsHost` gate is
-  what stops every client from spawning its own copy if this component happens to run on
-  clients too.
-- `Vector3.Random` returns a unit-length random direction, multiply it to whatever
-  radius you actually want.
-- `_alive.RemoveAll( go => !go.IsValid() )` is the idiomatic way to prune destroyed
-  references, since `GameObject.IsValid()` goes `false` right after `Destroy()`.
-- Parenting spawned objects under the spawner's own `GameObject` gives free cleanup in
-  `OnDestroy` and a single place to disable the whole set with `GameObject.Enabled = false`.
+Worth flagging:
+- `Prefab.Clone(pos, rot)` keeps a live link to the source prefab, so edits made to the
+  prefab asset later propagate to every clone. That link only breaks if `BreakFromPrefab()`
+  is called deliberately.
+- `NetworkSpawn()` belongs to the authority alone. The `Networking.IsHost` check is what
+  keeps every connected client from spawning its own duplicate if this component happens
+  to also run there.
+- `Vector3.Random` hands back a unit-length direction, so scale it by whatever radius is
+  actually wanted.
+- Pruning dead references with `_alive.RemoveAll( go => !go.IsValid() )` is the standard
+  idiom, since `GameObject.IsValid()` flips to `false` the instant `Destroy()` runs.
+- Parenting spawned objects to the spawner's own `GameObject` buys automatic cleanup
+  through `OnDestroy` and a single switch, `GameObject.Enabled = false`, to disable the
+  whole group at once.
 
 ---
 

@@ -5,22 +5,31 @@
 //  Links    : https://fobiat.dev/   https://github.com/fobiat
 //  Licence  : MIT, see LICENSE at the repository root.
 //
-//  Editor-side MCP tools that close the gap between editing s&box source on disk
-//  and getting it compiled. Drop this file in your project's Editor/ folder and
-//  the tools appear under the "sbox_dev" toolset in list_toolsets.
+//  Nine editor MCP tools that close the gap between editing s&box source on disk
+//  and getting the editor to notice. Drop this file into a project's Editor/
+//  folder and the tools appear under the "sbox_dev" toolset in list_toolsets.
 //
-//  The gap is real and costs sessions. The engine reads the .sbproj at editor
-//  boot, or writes it from the in-editor Project Settings page, and nothing
-//  watches it for external edits (field note FN-3). Separately, after compilers
-//  are recreated in-process their source file watchers have been observed to stop
-//  firing (field note FN-4). Either one leaves an agent editing files that never
-//  reach Roslyn, with no error to notice.
+//  The gap is real and costs whole sessions, because it has three separate
+//  causes and none of them produce an error:
 //
-//  Everything here reaches internal engine API by reflection, because editor
-//  assemblies are unsandboxed but still outside Sandbox.Engine. Verified against
-//  engine 26.08.05. Each reflected member is resolved through Required*, which
-//  throws the missing name: the failure mode of this file is silent staleness
-//  after an engine update, and a thrown name beats that.
+//    1. The .sbproj is read at editor boot and written from the Project Settings
+//       page. Nothing watches it. An edited Metadata.Compiler block never
+//       reaches Roslyn.                                        (field note FN-3)
+//    2. ProjectSettings/*.config files are cached on first read. An edited
+//       Input.config or Platform.config keeps serving the old values.
+//    3. After compilers are recreated in-process, their source file watchers
+//       have been observed to stop firing, so .cs edits never compile.
+//                                                              (field note FN-4)
+//
+//  In each case an agent edits a file, sees no error, and concludes its change
+//  was wrong. These tools let it check instead of guess.
+//
+//  Most engine members used here are internal, so they are reached by
+//  reflection: editor assemblies are unsandboxed but still sit outside
+//  Sandbox.Engine. Everything is verified against engine 26.08.05. Reflected
+//  members resolve through Required*, which throws the missing name, because
+//  the failure mode of a file like this is silent staleness after an engine
+//  update and a thrown name beats a tool that quietly returns success.
 // =============================================================================
 
 using System;
@@ -33,19 +42,21 @@ using System.Threading.Tasks;
 namespace Editor.Mcp;
 
 /// <summary>
-/// Project and compiler tools for working on an s&amp;box game from outside the editor.
+/// Project, config and compiler tools for driving an s&amp;box project from outside the editor.
 /// </summary>
-[McpToolset( "sbox_dev", "Inspect and drive the open project's compilers: read project info, list compile errors, reload an externally edited .sbproj, and rebuild from source on disk." )]
+[McpToolset( "sbox_dev", "Inspect and drive the open project: read project and compiler state, list compile errors and input actions, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
 public static class SboxDevTools
 {
 	const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
 	const BindingFlags InstanceInternal = BindingFlags.Instance | BindingFlags.NonPublic;
 
+	// ---------------------------------------------------------------- reading
+
 	/// <summary>
-	/// Report which project the editor has open, where it lives on disk, and the compiler
-	/// settings currently live in memory. Start here when a change on disk is not taking
-	/// effect, because the settings reported are the ones Roslyn is actually using, not
-	/// whatever the .sbproj on disk currently says.
+	/// Report which project the editor has open, where it sits on disk, and the compiler
+	/// settings currently live in memory. Start here when an on-disk change is not taking
+	/// effect: the settings reported are what Roslyn is actually using, which is not
+	/// necessarily what the .sbproj on disk now says.
 	/// </summary>
 	[McpTool.ReadOnly( "project_info" )]
 	public static object ProjectInfo()
@@ -68,9 +79,9 @@ public static class SboxDevTools
 	}
 
 	/// <summary>
-	/// List every compiler the project owns with its current build state. Useful when a build
-	/// looks stuck: a compiler sitting at NeedsBuild true with IsBuilding false has work queued
-	/// that nothing has started.
+	/// List the project's compilers with their build state. A compiler sitting at NeedsBuild
+	/// true while IsBuilding is false has work queued that nothing has started, which is what
+	/// a stalled build looks like from the outside.
 	/// </summary>
 	[McpTool.ReadOnly( "project_compilers" )]
 	public static object ProjectCompilers()
@@ -86,10 +97,42 @@ public static class SboxDevTools
 	}
 
 	/// <summary>
-	/// Return the current compile diagnostics as structured rows rather than console text,
-	/// so errors can be read without scraping read_console. Errors come first. Pass
-	/// includeWarnings to see warnings too, which matters when the project builds with
-	/// TreatWarningsAsErrors, because then a warning is what failed the build.
+	/// Ask each compiler what source changes it has actually noticed since its last build.
+	/// This is the direct answer to "did my edit register", and it separates a file the
+	/// compiler never saw from a file it saw and rejected. An empty summary right after you
+	/// edited a .cs file means the watchers are stale: run project_build.
+	/// </summary>
+	[McpTool.ReadOnly( "project_source_changes" )]
+	public static object ProjectSourceChanges()
+	{
+		var project = CurrentProject();
+
+		object Summary( string slot )
+		{
+			var compiler = ReflectedProperty( typeof( Project ), slot, InstanceInternal )?.GetValue( project );
+			if ( compiler is null ) return null;
+
+			var summary = ReflectedProperty( compiler.GetType(), "ChangeSummary", InstanceInternal )?.GetValue( compiler );
+
+			return new
+			{
+				Slot = slot,
+				Name = ReadMember( compiler, "Name" ),
+				Changes = summary,
+			};
+		}
+
+		return new
+		{
+			Compilers = new[] { Summary( "Compiler" ), Summary( "EditorCompiler" ) }.Where( x => x is not null ).ToArray(),
+			Hint = "An empty change set straight after editing a .cs file means the file watchers are stale. Run project_build.",
+		};
+	}
+
+	/// <summary>
+	/// Return current compile diagnostics as structured rows with file and line, so errors can
+	/// be read without scraping read_console. Errors sort first. Pass includeWarnings when the
+	/// project builds with TreatWarningsAsErrors, because then a warning is what failed it.
 	/// </summary>
 	[McpTool.ReadOnly( "project_compile_errors" )]
 	public static object ProjectCompileErrors(
@@ -112,15 +155,42 @@ public static class SboxDevTools
 		{
 			Count = rows.Length,
 			Diagnostics = rows,
-			Hint = rows.Length == 0 ? "No diagnostics. If a source edit still is not live, try project_rebuild." : null,
+			Hint = rows.Length == 0 ? "No diagnostics. If a source edit still is not live, run project_source_changes." : null,
 		};
 	}
 
 	/// <summary>
+	/// List the input actions this project defines, with their keyboard and gamepad bindings.
+	/// Input actions are strings resolved at runtime, so Input.Down( "jump" ) on an action that
+	/// does not exist compiles cleanly and silently never fires. Check the name here first.
+	/// </summary>
+	[McpTool.ReadOnly( "project_input_actions" )]
+	public static object ProjectInputActions()
+	{
+		var actions = Sandbox.Input.GetActions()?.ToArray() ?? Array.Empty<Sandbox.InputAction>();
+
+		return new
+		{
+			Count = actions.Length,
+			Actions = actions.Select( a => new
+			{
+				a.Name,
+				a.Title,
+				Group = a.GroupName,
+				Keyboard = a.KeyboardCode,
+				Gamepad = a.GamepadCode.ToString(),
+			} ).ToArray(),
+		};
+	}
+
+	// ---------------------------------------------------------------- writing
+
+	/// <summary>
 	/// Re-read the project's .sbproj from disk into the live config and recreate its compilers,
 	/// so an externally edited Metadata.Compiler block actually reaches Roslyn. Nothing watches
-	/// the .sbproj for external edits, so without this an on-disk config change silently never
-	/// takes effect. Returns the compiler settings now live, read back from the reloaded config.
+	/// that file, so without this an on-disk config change silently never takes effect. Returns
+	/// the compiler settings now live, read back from the reloaded config so you can confirm
+	/// the change landed rather than assuming it did.
 	/// </summary>
 	[McpTool( "project_reload_config" )]
 	public static object ProjectReloadConfig()
@@ -139,9 +209,30 @@ public static class SboxDevTools
 	}
 
 	/// <summary>
-	/// Dispose and recreate every compiler, then start a full build from the source on disk.
-	/// Returns immediately. Use this when source edits made outside the editor are not being
-	/// picked up, then poll compile_status, or call project_build instead to wait for the result.
+	/// Drop the cached ProjectSettings so the next read pulls Input.config, Platform.config,
+	/// Collision.config and the rest fresh from disk. These are cached on first read and never
+	/// invalidated, which is a separate trap from the .sbproj one: edit Input.config externally
+	/// and the old actions keep resolving until the editor restarts. Returns the reloaded
+	/// action count so you can confirm the file parsed.
+	/// </summary>
+	[McpTool( "project_reload_settings" )]
+	public static object ProjectReloadSettings()
+	{
+		RequiredMethod( typeof( Sandbox.ProjectSettings ), "ClearCache", StaticInternal ).Invoke( null, null );
+
+		return new
+		{
+			Reloaded = true,
+			InputActions = Sandbox.Input.GetActions()?.Count() ?? 0,
+			Hint = "Configs re-read lazily on next access. Call project_input_actions to confirm Input.config parsed as expected.",
+		};
+	}
+
+	/// <summary>
+	/// Dispose and recreate every compiler, then start a build from the source on disk. Returns
+	/// immediately. Recreating the compilers is what resets stale file watchers, so this is the
+	/// fix when edits made outside the editor are not being picked up. Prefer project_build
+	/// unless you specifically want to carry on working while it runs.
 	/// </summary>
 	[McpTool( "project_rebuild" )]
 	public static object ProjectRebuild()
@@ -157,34 +248,36 @@ public static class SboxDevTools
 
 	/// <summary>
 	/// Build the project and wait for it to finish, then report success along with any errors.
-	/// This is the one-shot version of project_rebuild followed by polling: prefer it when you
-	/// just want to know whether the code compiles.
+	/// This is the one-shot version of project_rebuild followed by polling: reach for it when
+	/// the question is simply whether the code compiles.
 	/// </summary>
 	[McpTool( "project_build" )]
 	public static async Task<object> ProjectBuild(
-		[Description( "Recreate compilers before building, which also resets stale file watchers. Default true." )] bool rebuild = true )
+		[Description( "Recreate compilers first, which also resets stale file watchers. Default true." )] bool rebuild = true )
 	{
 		if ( rebuild )
 			RequiredMethod( typeof( Project ), "RebuildCompilers", StaticInternal ).Invoke( null, null );
 
-		var task = RequiredMethod( typeof( Project ), "CompileAsync", StaticInternal )
-			.Invoke( null, null ) as Task
+		var task = RequiredMethod( typeof( Project ), "CompileAsync", StaticInternal ).Invoke( null, null ) as Task
 			?? throw new Exception( "Project.CompileAsync did not return a Task, engine API changed." );
 
 		await task;
 
 		var success = task.GetType().GetProperty( "Result" )?.GetValue( task ) is true;
 
-		return new
-		{
-			Success = success,
-			Errors = success ? null : ProjectCompileErrors(),
-		};
+		return new { Success = success, Errors = success ? null : ProjectCompileErrors() };
 	}
+
+	// ---------------------------------------------------------------- helpers
 
 	static Project CurrentProject()
 	{
 		return Project.Current ?? throw new Exception( "No project is open in the editor." );
+	}
+
+	static object ReadMember( object target, string name )
+	{
+		return target?.GetType().GetProperty( name )?.GetValue( target );
 	}
 
 	static object ReadCompileSettings( Project project )
@@ -196,16 +289,14 @@ public static class SboxDevTools
 
 		if ( settings is null ) return null;
 
-		object Read( string name ) => settings.GetType().GetProperty( name )?.GetValue( settings );
-
 		return new
 		{
-			TreatWarningsAsErrors = Read( "TreatWarningsAsErrors" ),
-			Nullables = Read( "Nullables" ),
-			RootNamespace = Read( "RootNamespace" ),
-			DefineConstants = Read( "DefineConstants" ),
-			NoWarn = Read( "NoWarn" ),
-			WarningsAsErrors = Read( "WarningsAsErrors" ),
+			TreatWarningsAsErrors = ReadMember( settings, "TreatWarningsAsErrors" ),
+			Nullables = ReadMember( settings, "Nullables" ),
+			RootNamespace = ReadMember( settings, "RootNamespace" ),
+			DefineConstants = ReadMember( settings, "DefineConstants" ),
+			NoWarn = ReadMember( settings, "NoWarn" ),
+			WarningsAsErrors = ReadMember( settings, "WarningsAsErrors" ),
 		};
 	}
 
@@ -214,16 +305,14 @@ public static class SboxDevTools
 		var compiler = RequiredProperty( typeof( Project ), propertyName, InstanceInternal ).GetValue( project );
 		if ( compiler is null ) return null;
 
-		object Read( string name ) => compiler.GetType().GetProperty( name )?.GetValue( compiler );
-
 		return new
 		{
 			Slot = propertyName,
-			Name = Read( "Name" ),
-			AssemblyName = Read( "AssemblyName" ),
-			IsBuilding = Read( "IsBuilding" ),
-			NeedsBuild = Read( "NeedsBuild" ),
-			BuildSuccess = Read( "BuildSuccess" ),
+			Name = ReadMember( compiler, "Name" ),
+			AssemblyName = ReadMember( compiler, "AssemblyName" ),
+			IsBuilding = ReadMember( compiler, "IsBuilding" ),
+			NeedsBuild = ReadMember( compiler, "NeedsBuild" ),
+			BuildSuccess = ReadMember( compiler, "BuildSuccess" ),
 		};
 	}
 
@@ -233,21 +322,17 @@ public static class SboxDevTools
 	/// </summary>
 	static DiagnosticRow ReadDiagnostic( object diagnostic )
 	{
-		object Read( string name ) => diagnostic.GetType().GetProperty( name )?.GetValue( diagnostic );
-
-		var location = Read( "Location" );
+		var location = ReadMember( diagnostic, "Location" );
 		var span = location?.GetType().GetMethod( "GetLineSpan" )?.Invoke( location, null );
-		var path = span?.GetType().GetProperty( "Path" )?.GetValue( span ) as string;
-
-		var start = span?.GetType().GetProperty( "StartLinePosition" )?.GetValue( span );
-		var line = start?.GetType().GetProperty( "Line" )?.GetValue( start ) as int?;
+		var start = ReadMember( span, "StartLinePosition" );
+		var line = ReadMember( start, "Line" ) as int?;
 
 		return new DiagnosticRow
 		{
-			Id = Read( "Id" ) as string,
-			Severity = Read( "Severity" )?.ToString(),
+			Id = ReadMember( diagnostic, "Id" ) as string,
+			Severity = ReadMember( diagnostic, "Severity" )?.ToString(),
 			Message = diagnostic.ToString(),
-			File = path,
+			File = ReadMember( span, "Path" ) as string,
 			Line = line is null ? null : line + 1,
 		};
 	}
@@ -271,5 +356,14 @@ public static class SboxDevTools
 	{
 		return type.GetProperty( name, flags )
 			?? throw new Exception( $"{type.Name}.{name} not found, engine API changed." );
+	}
+
+	/// <summary>
+	/// A reflected member that is allowed to be absent, for optional diagnostics that should
+	/// degrade to null rather than fail the whole call.
+	/// </summary>
+	static PropertyInfo ReflectedProperty( Type type, string name, BindingFlags flags )
+	{
+		return type.GetProperty( name, flags );
 	}
 }

@@ -539,16 +539,16 @@ string GetBoneName( int boneIndex )
 Transform GetBoneTransform( int boneIndex )
 ```
 
-**`Model.Load` can return null: always null-check it.** Two different failure results
-(`Resources/Model/Model.Load.cs:12-28`):
+**Always null-check what `Model.Load` gives back.** It fails two separate ways depending
+on what you handed it (`Resources/Model/Model.Load.cs:12-28`):
 
-- Null / empty / whitespace path → returns `Model.Error`, the visible pink-checker
-  placeholder (`models/dev/error.vmdl`, `Model.Static.cs:58`).
-- A path that doesn't resolve → falls through to native lookup and returns **null**
-  (`Model.Static.cs:12-15` returns null for an invalid native handle).
+- Pass an empty, whitespace, or null path and you get `Model.Error` back, the pink
+  checkerboard placeholder (`models/dev/error.vmdl`, `Model.Static.cs:58`).
+- Pass a path that just doesn't exist and native lookup hands you back **null**
+  (`Model.Static.cs:12-15`, an invalid native handle resolves to null).
 
-So "no model set" gives you an error model, but "typo in the path" gives you a null
-reference two frames later.
+A blank path fails loud with a visible model. A typo'd path fails quiet, a few frames
+later, as a null reference somewhere downstream.
 
 ```csharp
 var model = Model.Load( path );
@@ -559,7 +559,8 @@ if ( model is null )
 }
 ```
 
-`Model.Load` asserts it is on the main thread. Use `Model.LoadAsync` off the hot path.
+Calling it off the main thread asserts. Reach for `Model.LoadAsync` instead when you're
+not on the hot path.
 
 ---
 
