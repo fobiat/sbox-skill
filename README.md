@@ -93,6 +93,10 @@ Install this and the second one is what you get.
 
 ## Get it running
 
+> Setting up **both halves together**? Follow the
+> **[Quickstart](QUICKSTART.md)** instead, which covers the loop they form and the problems each
+> one fixes for the other.
+
 Clone it somewhere your agent can read:
 
 ```bash

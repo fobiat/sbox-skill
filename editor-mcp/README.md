@@ -44,6 +44,9 @@ mkdir -p your-game/Editor
 cp editor-mcp/SboxDevTools.cs your-game/Editor/
 ```
 
+> Pairing this with the skill? The **[Quickstart](../QUICKSTART.md)** covers the loop the two
+> form together, which is where most of the value is.
+
 `Editor/` is a **separately compiled assembly**, not an `#if EDITOR` block in your game code.
 Code living there is unsandboxed, which is what lets this reach internal engine API at all.
 
