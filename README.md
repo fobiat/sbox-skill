@@ -31,6 +31,7 @@ Built and maintained by Kyle (fobiat).
 - [How to use it](#how-to-use-it)
 - [How it works](#how-it-works)
 - [The reference library](#the-reference-library)
+- [Bonus: the sbox_dev editor MCP toolset](#bonus-the-sbox_dev-editor-mcp-toolset)
 - [Field notes: the part you cannot get from docs](#field-notes-the-part-you-cannot-get-from-docs)
 - [Engine version and drift](#engine-version-and-drift)
 - [Contributing](#contributing)

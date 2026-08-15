@@ -57,9 +57,17 @@ Tool failures come back as **results with `isError`**, not protocol errors. Read
 | `play` | `play_start`, `play_stop`, `play_pause` |
 | `log` | `log_info`, `log_warning`, `log_error` |
 
-A project can register its own toolset from `Editor/` code with `[McpToolset]` +
-`[McpTool]` from a file in its `Editor/` folder. A project-registered toolset looks like
-`mygame_dev` exposing `project_rebuild` and `project_reload_config`.
+A project registers its own toolset by putting `[McpToolset]` on a static class in its
+`Editor/` folder and `[McpTool]` on the static methods inside it. The method's XML summary
+becomes the description an agent reads when deciding whether to call the tool, so write that
+sentence for a reader rather than as documentation. `[McpTool.ReadOnly]` marks a tool that
+never changes state, which lets a client run it without prompting the user. Tools run on the
+main thread, may return a `Task` to go async, and their return value is serialized to JSON.
+
+This skill ships one such toolset, `sbox_dev`, as a drop-in file at
+`editor-mcp/SboxDevTools.cs` in its own repository. It adds `project_info`,
+`project_compilers`, `project_compile_errors`, `project_reload_config`, `project_rebuild`
+and `project_build`, which exist to work around the two workflow traps recorded below.
 
 ### Registry conventions
 

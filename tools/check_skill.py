@@ -67,7 +67,10 @@ def check_orphans(text):
 
 
 def check_house_style():
-    for path in sorted(SKILL_DIR.rglob("*.md")):
+    targets = sorted(SKILL_DIR.rglob("*.md")) + sorted((ROOT / "editor-mcp").rglob("*"))
+    for path in targets:
+        if not path.is_file() or path.suffix not in (".md", ".cs"):
+            continue
         lines = path.read_text(encoding="utf-8").splitlines()
         for number, line in enumerate(lines, 1):
             if "—" in line:
