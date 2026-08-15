@@ -19,7 +19,7 @@ description: Use when writing or modifying code for s&box, sbox, the Facepunch s
 
 ## Read this before writing code
 
-**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast`: none of these exist. If you have written one, you have hallucinated it.
+**s&box is not Unity.** `MonoBehaviour`, `Start()`, `Update()`, `GetComponent<T>()` call sites, `Instantiate()`, `Destroy(gameObject)`, `Debug.Log`, `[SerializeField]`, `Input.GetKey()`, `Physics.Raycast`: none of these exist. If you have written one, you have invented it.
 
 s&box is a C# scripting layer on Source 2, built by Facepunch. It borrows the `GameObject` plus `Component` shape from Unity and almost nothing else. The lifecycle is different, the networking model is different, the coordinate system is different, and most of the API surface is named differently.
 
@@ -117,7 +117,7 @@ Match the task, open the file. Do not guess, open the file.
 
 ## Unity to s&box
 
-Any time you write the left column, you are hallucinating. Use the right.
+Any time you write the left column, you are inventing an API. Use the right.
 
 | Unity, wrong | s&box, correct |
 |---|---|
