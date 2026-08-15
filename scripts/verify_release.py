@@ -2,7 +2,7 @@
 # =============================================================================
 #  s&box Skill : release verification
 #
-#  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+#  Author   : fobiat (Kyle Tarff) <kyle@fobiat.dev>
 #  Links    : https://fobiat.dev/   https://github.com/fobiat
 #  Licence  : MIT, see LICENSE at the repository root.
 #
@@ -21,7 +21,7 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "sbox"
-MCP = ROOT / "editor-mcp" / "SboxDevTools.cs"
+MCP = ROOT / "editor-mcp" / "SboxMcpServer.cs"
 PLUGIN_DIR = ROOT / ".claude-plugin"
 LIBRARY = ROOT / "library"
 
@@ -105,7 +105,7 @@ def main():
 
     licence = (ROOT / "LICENSE").read_text(encoding="utf-8")
     check("Copyright (c) 2025 Facepunch Studios Ltd" in licence, "upstream MIT notice carried")
-    check("Kyle (fobiat)" in licence, "author copyright")
+    check("fobiat (Kyle Tarff)" in licence, "author copyright")
 
     gate = subprocess.run([sys.executable, str(ROOT / "scripts" / "check_skill.py")],
                           capture_output=True, text=True)
@@ -130,12 +130,12 @@ def main():
     check(latest is not None and latest.group(1) == plugin["version"],
           "plugin version matches changelog", latest.group(1) if latest else "none")
 
-    sbproj = json.loads((LIBRARY / "sbox_dev.sbproj").read_text(encoding="utf-8"))
+    sbproj = json.loads((LIBRARY / "sbox_mcp_server.sbproj").read_text(encoding="utf-8"))
     check(sbproj["Type"] == "library", "sbproj is a library", sbproj["Type"])
-    check(sbproj["Ident"] == "sbox_dev", "sbproj ident", sbproj["Ident"])
+    check(sbproj["Ident"] == "sbox_mcp_server", "sbproj ident", sbproj["Ident"])
 
     # the library ships a copy, and a drifted copy is a silently wrong package
-    check((LIBRARY / "Editor" / "SboxDevTools.cs").read_bytes() == MCP.read_bytes(),
+    check((LIBRARY / "Editor" / "SboxMcpServer.cs").read_bytes() == MCP.read_bytes(),
           "library copy identical to editor-mcp")
 
     print()

@@ -1,14 +1,14 @@
 // =============================================================================
-//  s&box Skill : sbox_dev MCP toolset
+//  s&box Skill : s&box MCP Server toolset
 //
-//  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+//  Author   : fobiat (Kyle Tarff) <kyle@fobiat.dev>
 //  Links    : https://fobiat.dev/   https://github.com/fobiat
 //  Licence  : MIT, see LICENSE at the repository root.
 //
 //  Eleven MCP tools for the s&box editor, in three groups: ask the running engine
 //  what an API really is, ask the editor what it currently believes, and make it
 //  notice a change on disk. Drop this file into a project's Editor/ folder and
-//  they appear under the "sbox_dev" toolset in list_toolsets.
+//  they appear under the "sbox_mcp_server" toolset in list_toolsets.
 //
 //  The third group exists because three engine behaviours can each swallow an
 //  edit without raising anything. The .sbproj is read once at boot and never
@@ -37,8 +37,8 @@ namespace Editor.Mcp;
 /// <summary>
 /// Project, config and compiler tools for driving an s&amp;box project from outside the editor.
 /// </summary>
-[McpToolset( "sbox_dev", "Query the running engine for real type signatures and input actions, read project and compiler state including what each compiler has noticed, list compile errors, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
-public static class SboxDevTools
+[McpToolset( "sbox_mcp_server", "Query the running engine for real type signatures and input actions, read project and compiler state including what each compiler has noticed, list compile errors, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
+public static class SboxMcpServer
 {
 	// ============================================================ ask the engine
 

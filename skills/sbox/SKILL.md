@@ -8,7 +8,7 @@ description: Use when writing or modifying code for s&box, sbox, the Facepunch s
 
   Router. Identifies which reference file answers the task and sends the reader there.
 
-  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Author  : fobiat (Kyle Tarff) <kyle@fobiat.dev>
   Links   : https://fobiat.dev/   https://github.com/fobiat
   Engine  : s&box 26.08.05
   Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
@@ -309,4 +309,4 @@ A schema entry proves an API exists. It does not prove it behaves the way you as
 
 *This file routes. The reference files teach. Do not answer an s&box question from this file alone.*
 
-*s&box skill by Kyle (fobiat), https://fobiat.dev/ and https://github.com/fobiat. MIT licensed. Written against engine 26.08.05 from Facepunch's MIT-licensed managed source.*
+*s&box skill by fobiat (Kyle Tarff), https://fobiat.dev/ and https://github.com/fobiat. MIT licensed. Written against engine 26.08.05 from Facepunch's MIT-licensed managed source.*

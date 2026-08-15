@@ -3,6 +3,22 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-08-15
+
+Renames the editor toolset. **This is a breaking change**: any agent or saved workflow that
+calls it by its old toolset id needs to be updated.
+
+### Changed
+- The MCP toolset registered by `editor-mcp/SboxMcpServer.cs` (formerly `SboxDevTools.cs`) is
+  now `sbox_mcp_server`, was `sbox_dev`. The class is renamed to match. Tool names themselves
+  (`project_find_type`, `project_build`, and so on) are unchanged.
+- The library package under `library/` follows the same rename: `sbox_dev.sbproj` is now
+  `sbox_mcp_server.sbproj`, with `Title` and `Ident` both `sbox_mcp_server`. A package reference
+  is now `fobiat.sbox_mcp_server`.
+- `editor-mcp/README.md` is restructured: a synopsis up top lists every tool and what it does in
+  one table, ahead of install instructions, instead of the tool descriptions being split across
+  three separate sections you had to read in order to get the full picture.
+
 ## [0.2.0] - 2026-08-15
 
 Distribution only. **The skill and the toolset are unchanged**, byte for byte. This release is

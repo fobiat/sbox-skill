@@ -158,8 +158,8 @@ The repo is its own plugin marketplace, so there is nothing to clone and nothing
 ```
 
 The skill triggers on its own frontmatter, and `/plugin update` brings new engine versions with
-it. `editor-mcp/SboxDevTools.cs` comes along in the installed plugin, so the
-[toolset](#the-other-half-sbox_dev) is a file copy away rather than another download.
+it. `editor-mcp/SboxMcpServer.cs` comes along in the installed plugin, so the
+[toolset](#the-other-half-the-sbox-mcp-server) is a file copy away rather than another download.
 
 </details>
 
@@ -285,9 +285,9 @@ the ones with no equivalent at all, like coroutines.
 
 <br>
 
-## The other half: `sbox_dev`
+## The other half: the s&box MCP Server
 
-[One file](editor-mcp/SboxDevTools.cs) into your `Editor/` folder, eleven tools onto the
+[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eleven tools onto the
 editor's MCP server. It solves a different silent failure: the editor not noticing you changed
 anything.
 
@@ -321,7 +321,7 @@ reference rather than a copied file.
 ```
 sbox-skill/
 ├── skills/sbox/        the skill, this is what you install
-├── editor-mcp/         the sbox_dev toolset, a drop-in Editor/ file
+├── editor-mcp/         the s&box MCP Server toolset, a drop-in Editor/ file
 ├── library/            the same toolset as an s&box library, for asset.party
 ├── .claude-plugin/     marketplace manifest, makes the repo installable
 ├── scripts/            repo tooling, never shipped to your game
@@ -372,7 +372,7 @@ tells you that. More in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 <div align="center">
 
-Built and maintained by **Kyle (fobiat)**
+Built and maintained by **fobiat (Kyle Tarff)**
 
 [![Website](https://img.shields.io/badge/fobiat.dev-1f6feb?style=for-the-badge)](https://fobiat.dev/)
 [![GitHub](https://img.shields.io/badge/fobiat-24292f?style=for-the-badge&logo=github)](https://github.com/fobiat)

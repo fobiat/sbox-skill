@@ -3,7 +3,7 @@
 
   The editor MCP server, and the ledger of behaviour confirmed in live sessions.
 
-  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Author  : fobiat (Kyle Tarff) <kyle@fobiat.dev>
   Links   : https://fobiat.dev/   https://github.com/fobiat
   Engine  : s&box 26.08.05
   Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
@@ -51,8 +51,8 @@ A failed tool call still comes back as a normal result carrying **`isError`**, n
 
 A project registers its own toolset by putting `[McpToolset]` on a static class in its `Editor/` folder and `[McpTool]` on the static methods inside it. The method's XML summary becomes the description an agent reads when deciding whether to call the tool, so write that sentence for a reader rather than as documentation. `[McpTool.ReadOnly]` marks a tool that never changes state, which lets a client run it without prompting the user. Tools run on the main thread, may return a `Task` to go async, and their return value is serialized to JSON.
 
-This skill ships one such toolset, `sbox_dev`, as a drop-in file at
-`editor-mcp/SboxDevTools.cs` in its own repository. Eleven tools, in three groups.
+This skill ships one such toolset, `sbox_mcp_server`, as a drop-in file at
+`editor-mcp/SboxMcpServer.cs` in its own repository. Eleven tools, in three groups.
 
 Working around the traps recorded below: `project_reload_config` re-reads an externally
 edited `.sbproj`, `project_reload_settings` drops the cached `ProjectSettings` so

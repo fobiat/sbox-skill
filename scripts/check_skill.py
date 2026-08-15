@@ -2,7 +2,7 @@
 # =============================================================================
 #  s&box Skill : structure checker
 #
-#  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+#  Author   : fobiat (Kyle Tarff) <kyle@fobiat.dev>
 #  Links    : https://fobiat.dev/   https://github.com/fobiat
 #  Licence  : MIT, see LICENSE at the repository root.
 #

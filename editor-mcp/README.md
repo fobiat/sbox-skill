@@ -1,13 +1,13 @@
 <div align="center">
 
-# `sbox_dev`
+# s&box MCP Server
 
 **Eleven MCP tools for the s&box editor, for when you edit a file and nothing happens.**
 
 [![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a?style=flat-square)](https://sbox.game)
 [![Licence](https://img.shields.io/badge/licence-MIT-3fb950?style=flat-square)](../LICENSE)
-[![Tools](https://img.shields.io/badge/tools-11-e3b341?style=flat-square)](SboxDevTools.cs)
-[![Single file](https://img.shields.io/badge/install-1_file-4c8eda?style=flat-square)](SboxDevTools.cs)
+[![Tools](https://img.shields.io/badge/tools-11-e3b341?style=flat-square)](SboxMcpServer.cs)
+[![Single file](https://img.shields.io/badge/install-1_file-4c8eda?style=flat-square)](SboxMcpServer.cs)
 
 *One file. Drop it in `Editor/`, restart, done.*
 
@@ -15,12 +15,58 @@
 
 ---
 
+## Synopsis
+
+The s&box editor already ships an MCP server with its own toolsets (`editor`, `asset`, `scene`,
+`component`, `package`, `play`, `log`). This file adds one more, registered as `sbox_mcp_server`,
+with eleven tools in three groups: ask the running engine what is actually true, ask the editor
+what it currently believes, and make it notice a change on disk.
+
+| Tool | Group | What it does |
+|---|---|---|
+| `project_find_type` | Ask the engine | Looks up a type by name in the loaded engine and reports what it is, so you know whether an API exists before you write it |
+| `project_type_members` | Ask the engine | Lists a type's real methods and properties, read straight from the running engine |
+| `project_input_actions` | Ask the engine | Lists every input action the project defines, with keyboard and gamepad bindings |
+| `project_info` | Ask the editor | Reports which project is open and the compiler settings currently live in memory |
+| `project_compilers` | Ask the editor | Lists each compiler's build state: `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
+| `project_source_changes` | Ask the editor | Reports what each compiler has actually noticed since its last build |
+| `project_compile_errors` | Ask the editor | Returns compile diagnostics as rows with file and line, instead of console text to scrape |
+| `project_reload_config` | Change something | Re-reads the `.sbproj` from disk into the live config and recreates the compilers |
+| `project_reload_settings` | Change something | Drops the cached `ProjectSettings`, so `Input.config` and friends are re-read from disk |
+| `project_rebuild` | Change something | Recreates every compiler and starts a build. Returns immediately |
+| `project_build` | Change something | Rebuilds and waits, then reports success plus any errors |
+
+The seven "ask" tools carry `McpToolHints.ReadOnly`, so a client can run them without stopping
+to ask permission. The four "change something" tools do not, since they touch live state.
+
+<br>
+
+## Quickstart
+
+```bash
+mkdir -p your-game/Editor
+cp editor-mcp/SboxMcpServer.cs your-game/Editor/
+```
+
+> Pairing this with the skill? The **[Quickstart](../QUICKSTART.md)** covers the loop the two
+> form together, which is where most of the value is.
+
+`Editor/` is a **separately compiled assembly**, not an `#if EDITOR` block in your game code.
+Code living there is unsandboxed, which is what lets this reach internal engine API at all.
+
+Restart the editor, then:
+
+```
+list_toolsets       → sbox_mcp_server, eleven tools
+describe_toolset    → full input schemas
+```
+
+---
+
 ## The problem
 
-The s&box editor already ships an MCP server, and its stock toolsets (`editor`, `asset`,
-`scene`, `component`, `package`, `play`, `log`) drive it well enough. What none of them cover
-is the part that burns an afternoon: getting the editor to **notice** you changed something on
-disk.
+None of the editor's stock toolsets cover the part that burns an afternoon: getting the editor
+to **notice** you changed something on disk.
 
 There are three reasons it might not, and not one of them raises an error.
 
@@ -37,40 +83,12 @@ These tools let you check instead of guess.
 
 ---
 
-## Install
-
-```bash
-mkdir -p your-game/Editor
-cp editor-mcp/SboxDevTools.cs your-game/Editor/
-```
-
-> Pairing this with the skill? The **[Quickstart](../QUICKSTART.md)** covers the loop the two
-> form together, which is where most of the value is.
-
-`Editor/` is a **separately compiled assembly**, not an `#if EDITOR` block in your game code.
-Code living there is unsandboxed, which is what lets this reach internal engine API at all.
-
-Restart the editor, then:
-
-```
-list_toolsets       → sbox_dev, eleven tools
-describe_toolset    → full input schemas
-```
-
----
-
-## The tools
+## The tools, in more detail
 
 ### 🔍 Ask the running engine
 
 The strongest three. They query the engine actually loaded in the editor, so the answer cannot
 be stale and cannot be a plausible invention.
-
-| Tool | Answers |
-|---|---|
-| `project_find_type` | Does this type exist, what kind is it, what does it derive from |
-| `project_type_members` | Real signatures for its methods and properties |
-| `project_input_actions` | Every input action this project defines, with bindings |
 
 `project_input_actions` earns its place for a subtle reason. Input actions are strings resolved
 at runtime, so `Input.Down( "jump" )` against an action that does not exist compiles perfectly
@@ -79,24 +97,14 @@ real vocabulary, you are spelling from memory.
 
 ### 📖 Ask the editor what it thinks is true
 
-| Tool | Answers |
-|---|---|
-| `project_info` | What is open, and the compiler settings **live in memory** rather than on disk |
-| `project_compilers` | Per compiler: `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
-| `project_source_changes` | What each compiler has actually noticed since its last build |
-| `project_compile_errors` | Diagnostics as rows with file and line, not console text to scrape |
-
-All seven of the above carry `McpToolHints.ReadOnly`, so a client can run them without stopping
-to ask permission.
+`project_info`, `project_compilers`, `project_source_changes` and `project_compile_errors` read
+the editor's own in-memory state rather than the engine's type system. This is where the
+"nothing watches the file" problem gets diagnosed.
 
 ### ⚙️ Make something happen
 
-| Tool | Does |
-|---|---|
-| `project_reload_config` | Re-reads the `.sbproj` into the live config and recreates compilers |
-| `project_reload_settings` | Drops the cached `ProjectSettings` so the configs come back off disk |
-| `project_rebuild` | Recreates every compiler and starts a build. Returns immediately |
-| `project_build` | Rebuild and **wait**, then report success plus errors |
+`project_reload_config`, `project_reload_settings`, `project_rebuild` and `project_build` are
+the only four that write state, which is why they are the only four without the read-only hint.
 
 ---
 
@@ -155,7 +163,7 @@ needs rewording.
 SBOX_MANAGED=/path/to/sbox/bin/managed/ dotnet build compilecheck/compilecheck.csproj
 ```
 
-That compiles `SboxDevTools.cs` against real engine assemblies using the same settings s&box
+That compiles `SboxMcpServer.cs` against real engine assemblies using the same settings s&box
 puts in a generated `Editor/` project: nullable enabled, warnings as errors, and the two static
 global-namespace usings rather than a blanket `using Sandbox;`. Those settings are deliberate.
 Relaxing any of them would let the file pass here and fail in somebody's editor, which is the
@@ -240,7 +248,7 @@ public static class MyTools
 
 ## Credits
 
-Built and maintained by **Kyle (fobiat)**.
+Built and maintained by **fobiat (Kyle Tarff)**.
 
 [![Website](https://img.shields.io/badge/fobiat.dev-1f6feb?style=flat-square)](https://fobiat.dev/)
 [![GitHub](https://img.shields.io/badge/github.com%2Ffobiat-24292f?style=flat-square)](https://github.com/fobiat)

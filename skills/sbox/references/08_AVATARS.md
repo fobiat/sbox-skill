@@ -3,7 +3,7 @@
 
   The Citizen avatar: Clothing, ClothingContainer and dressing a SkinnedModelRenderer.
 
-  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Author  : fobiat (Kyle Tarff) <kyle@fobiat.dev>
   Links   : https://fobiat.dev/   https://github.com/fobiat
   Engine  : s&box 26.08.05
   Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,

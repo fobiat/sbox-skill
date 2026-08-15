@@ -1,8 +1,8 @@
 {
-  "Title": "sbox_dev",
+  "Title": "sbox_mcp_server",
   "Type": "library",
   "Org": "fobiat",
-  "Ident": "sbox_dev",
+  "Ident": "sbox_mcp_server",
   "Tags": "tool editor mcp development",
   "Schema": 1,
   "HasAssets": false,

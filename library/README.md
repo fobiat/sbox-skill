@@ -1,10 +1,11 @@
-# `sbox_dev` as an s&box code library
+# s&box MCP Server as an s&box code library
 
-This directory packages the [`sbox_dev` toolset](../editor-mcp) as a **library** project, so it
-can be published to asset.party and pulled in as a package reference instead of copied file by
-file.
+This directory packages the [s&box MCP Server toolset](../editor-mcp) as a **library** project,
+so it can be published to asset.party and pulled in as a package reference instead of copied
+file by file.
 
-Install becomes: open Project Settings, add `fobiat.sbox_dev` to package references, restart.
+Install becomes: open Project Settings, add `fobiat.sbox_mcp_server` to package references,
+restart.
 
 ## Why this works
 
@@ -35,12 +36,12 @@ question that source cannot answer. Publish it once and find out before relying 
 
 ```
 library/
-  sbox_dev.sbproj      Type: library, Org: fobiat, Ident: sbox_dev
+  sbox_mcp_server.sbproj   Type: library, Org: fobiat, Ident: sbox_mcp_server
   Editor/
-    SboxDevTools.cs    byte-identical copy of editor-mcp/SboxDevTools.cs
+    SboxMcpServer.cs       byte-identical copy of editor-mcp/SboxMcpServer.cs
 ```
 
-`editor-mcp/SboxDevTools.cs` stays canonical. A library cannot reference a source file outside
+`editor-mcp/SboxMcpServer.cs` stays canonical. A library cannot reference a source file outside
 its own project root, so this is a copy rather than a link, kept honest by two things: run
 `python3 scripts/sync_library.py` after editing the canonical file, and
 `scripts/verify_release.py` fails the build if the two ever differ.
@@ -48,9 +49,10 @@ its own project root, so this is a copy rather than a link, kept honest by two t
 ## Publishing it
 
 1. Add this directory as a project in the s&box editor. It should appear under Libraries.
-2. Check the toolset still registers: `list_toolsets` should show `sbox_dev` with eleven tools.
-3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_dev`.
-4. In a consumer, add `fobiat.sbox_dev` to package references and restart the editor.
+2. Check the toolset still registers: `list_toolsets` should show `sbox_mcp_server` with eleven
+   tools.
+3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_mcp_server`.
+4. In a consumer, add `fobiat.sbox_mcp_server` to package references and restart the editor.
 
 Step 2 matters. If the tools do not appear when the library is loaded from a package rather
 than from a local `Editor/` folder, the file-drop install in

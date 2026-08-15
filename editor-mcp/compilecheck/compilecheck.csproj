@@ -1,7 +1,7 @@
 <!--
-  s&box Skill : headless compile check for SboxDevTools.cs
+  s&box Skill : headless compile check for SboxMcpServer.cs
 
-  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Author  : fobiat (Kyle Tarff) <kyle@fobiat.dev>
   Links   : https://fobiat.dev/   https://github.com/fobiat
   Licence : MIT, see LICENSE at the repository root.
 
@@ -22,7 +22,7 @@
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
-    <AssemblyName>sboxdevtools-compilecheck</AssemblyName>
+    <AssemblyName>sboxmcpserver-compilecheck</AssemblyName>
     <LangVersion>14</LangVersion>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
@@ -46,14 +46,14 @@
   </Target>
 
   <!-- What s&box puts in a generated Editor/ csproj. Not "using Sandbox;", which is why
-       SboxDevTools.cs carries that one explicitly. -->
+       SboxMcpServer.cs carries that one explicitly. -->
   <ItemGroup>
     <Using Include="Sandbox.Internal.GlobalToolsNamespace" Static="true" />
     <Using Include="Sandbox.Internal.GlobalGameNamespace" Static="true" />
   </ItemGroup>
 
   <ItemGroup>
-    <Compile Include="../SboxDevTools.cs" />
+    <Compile Include="../SboxMcpServer.cs" />
   </ItemGroup>
 
   <ItemGroup>

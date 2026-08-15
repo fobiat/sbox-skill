@@ -89,7 +89,7 @@ place to start a conversation and not enough on its own to change a line.
 
 ## Credits
 
-Written and maintained by **Kyle (fobiat)**, [fobiat.dev](https://fobiat.dev/),
+Written and maintained by **fobiat (Kyle Tarff)**, [fobiat.dev](https://fobiat.dev/),
 [github.com/fobiat](https://github.com/fobiat), kyle@fobiat.dev.
 
 MIT licensed. See [LICENSE](LICENSE), which also carries Facepunch's own MIT notice, since

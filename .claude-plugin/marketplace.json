@@ -1,7 +1,7 @@
 {
   "name": "sbox-skill",
   "owner": {
-    "name": "Kyle Tarff",
+    "name": "fobiat (Kyle Tarff)",
     "email": "kyle@fobiat.dev",
     "url": "https://fobiat.dev"
   },
@@ -12,8 +12,8 @@
     {
       "name": "sbox",
       "source": "./",
-      "description": "Teaches a coding agent the real s&box API from 16 source-verified reference files, so it stops writing Unity patterns into a Source 2 project. Covers the scene system, components, Razor UI, networking, input and physics, editor extensions, services, avatars, rendering, audio, ActionGraph and VR. Every API is traceable to engine source at version 26.08.05. Ships the sbox_dev editor toolset alongside it.",
-      "version": "0.2.0",
+      "description": "Teaches a coding agent the real s&box API from 16 source-verified reference files, so it stops writing Unity patterns into a Source 2 project. Covers the scene system, components, Razor UI, networking, input and physics, editor extensions, services, avatars, rendering, audio, ActionGraph and VR. Every API is traceable to engine source at version 26.08.05. Ships the s&box MCP Server editor toolset alongside it.",
+      "version": "0.3.0",
       "category": "game-development",
       "keywords": [
         "sbox",
@@ -25,7 +25,7 @@
         "razor"
       ],
       "author": {
-        "name": "Kyle Tarff",
+        "name": "fobiat (Kyle Tarff)",
         "email": "kyle@fobiat.dev"
       },
       "homepage": "https://github.com/fobiat/sbox-skill",

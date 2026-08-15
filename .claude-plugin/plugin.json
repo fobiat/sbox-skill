@@ -1,9 +1,9 @@
 {
   "name": "sbox",
   "description": "Teaches a coding agent the real s&box API from 16 source-verified reference files, so it stops writing Unity patterns into a Source 2 project. Verified against engine 26.08.05.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
-    "name": "Kyle Tarff",
+    "name": "fobiat (Kyle Tarff)",
     "email": "kyle@fobiat.dev",
     "url": "https://fobiat.dev"
   },

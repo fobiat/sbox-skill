@@ -2,11 +2,11 @@
 # =============================================================================
 #  s&box Skill : library sync
 #
-#  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+#  Author   : fobiat (Kyle Tarff) <kyle@fobiat.dev>
 #  Links    : https://fobiat.dev/   https://github.com/fobiat
 #  Licence  : MIT, see LICENSE at the repository root.
 #
-#  editor-mcp/SboxDevTools.cs is canonical. library/ ships a byte-identical copy
+#  editor-mcp/SboxMcpServer.cs is canonical. library/ ships a byte-identical copy
 #  because an s&box library has to contain its own Editor/ folder and cannot
 #  reference a file outside the project root. Run this after editing the
 #  canonical file; verify_release.py fails if the two ever disagree.
@@ -17,8 +17,8 @@ import shutil
 import sys
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
-SOURCE = ROOT / "editor-mcp" / "SboxDevTools.cs"
-TARGET = ROOT / "library" / "Editor" / "SboxDevTools.cs"
+SOURCE = ROOT / "editor-mcp" / "SboxMcpServer.cs"
+TARGET = ROOT / "library" / "Editor" / "SboxMcpServer.cs"
 
 
 def main():

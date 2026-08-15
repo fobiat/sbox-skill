@@ -58,13 +58,14 @@ file it routes you to. Do not write an API that is not in those files.
 
 ```bash
 mkdir -p your-game/Editor
-cp sbox-skill/editor-mcp/SboxDevTools.cs your-game/Editor/
+cp sbox-skill/editor-mcp/SboxMcpServer.cs your-game/Editor/
 ```
 
 `Editor/` is a separately compiled assembly, not an `#if EDITOR` block in your game code. That
 is what lets it reach engine internals.
 
-Restart the editor. Your agent should now see `sbox_dev` in `list_toolsets`, with eleven tools.
+Restart the editor. Your agent should now see `sbox_mcp_server` in `list_toolsets`, with eleven
+tools.
 
 <br>
 
@@ -169,12 +170,12 @@ skills-directory tool registering it at all.
 </details>
 
 <details>
-<summary><b><code>sbox_dev</code> does not appear in <code>list_toolsets</code></b></summary>
+<summary><b><code>sbox_mcp_server</code> does not appear in <code>list_toolsets</code></b></summary>
 
 <br>
 
 The `Editor/` assembly did not compile, or the editor did not restart. Check the editor console
-for a compile error in `SboxDevTools.cs`. If it names a missing engine member, the engine has
+for a compile error in `SboxMcpServer.cs`. If it names a missing engine member, the engine has
 moved past 26.08.05 and that member was renamed. The thrown name tells you which one, which is
 the whole reason it throws instead of failing quietly.
 

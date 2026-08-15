@@ -2,7 +2,7 @@
 # =============================================================================
 #  s&box Skill : header stamper
 #
-#  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+#  Author   : fobiat (Kyle Tarff) <kyle@fobiat.dev>
 #  Links    : https://fobiat.dev/   https://github.com/fobiat
 #  Licence  : MIT, see LICENSE at the repository root.
 #
@@ -21,7 +21,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SKILL_DIR = ROOT / "skills" / "sbox"
 ENGINE = "26.08.05"
-AUTHOR = "Kyle (fobiat) <kyle@fobiat.dev>"
+AUTHOR = "fobiat (Kyle Tarff) <kyle@fobiat.dev>"
 LINKS = "https://fobiat.dev/   https://github.com/fobiat"
 
 BLOCK = re.compile(r"\A<!--\n  s&box Skill.*?-->\n\n?", re.DOTALL)
