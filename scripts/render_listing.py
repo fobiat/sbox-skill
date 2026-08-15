@@ -12,7 +12,7 @@
 #
 #      python scripts/render_listing.py
 #
-#  The two halves are always the MCP Server and the AI Agent Skill. Never
+#  The two halves are always the MCP Server and the AI Skill. Never
 #  "toolset", which is the repository's internal word for the same code.
 # =============================================================================
 
@@ -243,7 +243,7 @@ def s04(d):
 
 # ---------------------------------------------------------------- 05 install
 BLOCKS = [
-    ("AI Agent Skill", AI, 72, [
+    ("AI Skill", AI, 72, [
         ("Any agent with a skills directory", None),
         ("cp -r sbox-skill/skills/sbox .claude/skills/", AI),
         ("", None),
@@ -293,7 +293,7 @@ def loading(path, w=1920, h=1080):
     icon(d, (w / 2 - 160) * SS, (h / 2 - 268) * SS, 5 * SS)
     text(d, (w / 2 * SS, (h / 2 + 136) * SS), "s&box", font(BOLD, 54 * SS), GREY, -1.5 * SS, "ms")
     text(d, (w / 2 * SS, (h / 2 + 200) * SS), "MCP Server", font(BOLD, 54 * SS), WHITE, -1.5 * SS, "ms")
-    text(d, (w / 2 * SS, (h / 2 + 252) * SS), "+ AI Agent Skill", font(BOLD, 34 * SS), MCP, -1.0 * SS, "ms")
+    text(d, (w / 2 * SS, (h / 2 + 252) * SS), "+ AI Skill", font(BOLD, 34 * SS), MCP, -1.0 * SS, "ms")
     text(d, (w / 2 * SS, (h / 2 + 308) * SS), "fobiat", font(MED, 26 * SS), GREEN, 0, "ms")
     f = font(MED, 22 * SS)
     text(d, (72 * SS, (h - 64) * SS), "github.com/fobiat/sbox-skill", f, LEG)
@@ -308,7 +308,7 @@ def thumb_tall(path, w=512, h=910):
     icon(d, 128 * SS, 214 * SS, 4 * SS)
     text(d, (256 * SS, 574 * SS), "s&box", font(BOLD, 62 * SS), GREY, -1.5 * SS, "ms")
     text(d, (256 * SS, 644 * SS), "MCP Server", font(BOLD, 62 * SS), WHITE, -1.5 * SS, "ms")
-    text(d, (256 * SS, 700 * SS), "+ AI Agent Skill", font(BOLD, 33 * SS), MCP, -1.0 * SS, "ms")
+    text(d, (256 * SS, 700 * SS), "+ AI Skill", font(BOLD, 33 * SS), MCP, -1.0 * SS, "ms")
     text(d, (256 * SS, 754 * SS), "fobiat", font(MED, 26 * SS), GREEN, 0, "ms")
     text(d, (256 * SS, 802 * SS), "github.com/fobiat/sbox-skill", font(MED, 22 * SS), GREY, 0, "ms")
     save(im, w, h, path)
@@ -319,7 +319,7 @@ def thumb_wide(path, w=910, h=512):
     icon(d, 96 * SS, 140 * SS, 3.5 * SS)
     text(d, (376 * SS, 240 * SS), "s&box", font(BOLD, 60 * SS), GREY, -1.5 * SS)
     text(d, (376 * SS, 308 * SS), "MCP Server", font(BOLD, 60 * SS), WHITE, -1.5 * SS)
-    text(d, (378 * SS, 360 * SS), "+ AI Agent Skill", font(BOLD, 31 * SS), MCP, -1.0 * SS)
+    text(d, (378 * SS, 360 * SS), "+ AI Skill", font(BOLD, 31 * SS), MCP, -1.0 * SS)
     text(d, (378 * SS, 410 * SS), "fobiat", font(MED, 25 * SS), GREEN)
     text(d, (378 * SS, 452 * SS), "github.com/fobiat/sbox-skill", font(MED, 21 * SS), GREY)
     save(im, w, h, path)

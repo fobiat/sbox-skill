@@ -21,7 +21,7 @@ BG, PANEL, EDGE = "#181818", "#202020", "#2E2E2E"
 GREEN, BLUE, GREY, LEG, WHITE = "#2BB88E", "#00A8E8", "#9E9E9E", "#656565", "#EEF3F1"
 RED, TILE, RULE = "#E5484D", "#202020", "#3E3E3E"
 
-# Green is the AI Agent Skill, blue is the MCP Server, everywhere.
+# Green is the AI Skill, blue is the MCP Server, everywhere.
 AI, MCP = GREEN, BLUE
 
 _USER_FONTS = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Microsoft", "Windows", "Fonts")

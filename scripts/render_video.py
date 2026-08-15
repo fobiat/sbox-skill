@@ -71,7 +71,7 @@ def card(d, title, sub, y=None):
 def end_card(d):
     icon(d, W / 2 - 90, 232, 2.8)
     text(d, (W / 2, 556), "s&box MCP Server", font(BOLD, 58), WHITE, -1.5, "ms")
-    text(d, (W / 2, 612), "+ AI Agent Skill", font(BOLD, 36), BLUE, -1.0, "ms")
+    text(d, (W / 2, 612), "+ AI Skill", font(BOLD, 36), BLUE, -1.0, "ms")
     text(d, (W / 2, 736), "github.com/fobiat/sbox-skill", font(MED, 32), GREEN, 0, "ms")
     text(d, (W / 2, 790), "fobiat.dev", font(MED, 30), LEG, 0, "ms")
 
@@ -156,7 +156,7 @@ def video_unity():
     c.wait(0.4)
     c.type("> Write me an s&box component that moves a cube forward.", BLUE, 40)
     c.out("", GREY, 0.3)
-    c.out("Without the AI Agent Skill", LEG, 0.5)
+    c.out("Without the AI Skill", LEG, 0.5)
     for ln, col in [("public class Mover : MonoBehaviour   // does not exist", RED),
                     ("{", WHITE),
                     ("    void Update()                    // never called", RED),
@@ -169,7 +169,7 @@ def video_unity():
         c.out(ln, col, 0.26)
     c.wait(1.6)
     c.clear()
-    c.out("Same prompt, with the AI Agent Skill installed", LEG, 0.7)
+    c.out("Same prompt, with the AI Skill installed", LEG, 0.7)
     for ln, col in [("public sealed class Mover : Component", WHITE),
                     ("{", WHITE),
                     ("    [Property] public float Speed { get; set; } = 200f;", GREEN),
@@ -192,8 +192,8 @@ def video_unity():
     c.out("  Nothing invented.", GREEN, 0.3)
     c.blink(2.2)
 
-    frames = still(lambda d: card(d, "It is not Unity", "The AI Agent Skill, 17 reference files"), 2.0)
-    frames += [frame_console(l, cur, "The AI Agent Skill", "skills/sbox/SKILL.md") for l, cur in c.frames]
+    frames = still(lambda d: card(d, "It is not Unity", "The AI Skill, 17 reference files"), 2.0)
+    frames += [frame_console(l, cur, "The AI Skill", "skills/sbox/SKILL.md") for l, cur in c.frames]
     frames += still(end_card, 2.6)
     encode(frames, os.path.join(OUT, "video-2-agent-skill.mp4"))
 
