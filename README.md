@@ -16,8 +16,9 @@
 > **In short.** Two things for building [s&box](https://sbox.game) games, either usable on its own.
 >
 > **The skill** is 16 reference files that teach a coding agent the real s&box API, so it stops
-> writing Unity code into your Source 2 project. Drop it in `.claude/skills/`, and it triggers
-> by itself on any s&box file. Every API in it is traceable to engine source at a named version.
+> writing Unity code into your Source 2 project. Plain markdown, no runtime, no dependencies, so
+> it works with any agent that can read a file. Every API in it is traceable to engine source at
+> a named version.
 >
 > **The toolset** is one C# file for your `Editor/` folder that adds 11 tools to the editor's
 > MCP server. It answers the questions the editor otherwise leaves silent: does this type
@@ -92,30 +93,74 @@ Install this and the second one is what you get.
 
 ## Get it running
 
+Clone it somewhere your agent can read:
+
 ```bash
-git clone https://github.com/fobiat/sbox-skill.git /tmp/sbox-skill
-mkdir -p your-game/.claude/skills
-cp -r /tmp/sbox-skill/skills/sbox your-game/.claude/skills/
+git clone https://github.com/fobiat/sbox-skill.git
 ```
 
-<details>
-<summary>Other install options</summary>
+There is no runtime and nothing to build. `skills/sbox/SKILL.md` is the entry point, and it
+routes to `references/`. Any agent that can open a file can use it. Pick whichever of these
+matches your setup.
+
+<details open>
+<summary><b>Any agent, via its instructions file</b></summary>
 
 <br>
 
-**Globally**, for every project you open:
+Most agents read a project instructions file, whatever it is called in your tool. Point it at
+the router and let it do the rest:
 
-```bash
-mkdir -p ~/.claude/skills
-cp -r /tmp/sbox-skill/skills/sbox ~/.claude/skills/
+```markdown
+## s&box
+
+Before writing or changing any s&box C#, read `docs/sbox-skill/SKILL.md` and open the
+reference file it routes you to. Do not write an API that is not in those files.
 ```
 
-**As a submodule**, so `git pull` brings updates with it:
+Copy `skills/sbox/` to wherever that path points, and you are done.
+
+</details>
+
+<details>
+<summary><b>Agents with a skills directory</b></summary>
+
+<br>
+
+If your tool auto-loads skills from a directory, `SKILL.md` already carries the frontmatter for
+it, so it triggers on its own with no instructions file needed:
 
 ```bash
-git submodule add https://github.com/fobiat/sbox-skill.git .claude/skills/sbox-skill
-ln -s sbox-skill/skills/sbox .claude/skills/sbox
+mkdir -p your-game/.claude/skills
+cp -r sbox-skill/skills/sbox your-game/.claude/skills/
 ```
+
+Swap the path for your tool's own skills directory. Use the home directory equivalent instead
+to make it available in every project.
+
+</details>
+
+<details>
+<summary><b>As a submodule</b>, so <code>git pull</code> brings updates with it</summary>
+
+<br>
+
+```bash
+git submodule add https://github.com/fobiat/sbox-skill.git vendor/sbox-skill
+ln -s ../vendor/sbox-skill/skills/sbox docs/sbox-skill
+```
+
+</details>
+
+<details>
+<summary><b>No agent at all</b></summary>
+
+<br>
+
+It reads fine as documentation. Start at
+[`SKILL.md`](skills/sbox/SKILL.md) for the Unity translation table and the list of silent
+failures, or go straight to whichever
+[reference file](skills/sbox/references) matches what you are building.
 
 </details>
 
@@ -127,7 +172,7 @@ ln -s sbox-skill/skills/sbox .claude/skills/sbox
 
 Working, if you see `: Component`, `protected override void OnUpdate()` and `Vector3.Forward`.
 Not working, if you see `MonoBehaviour`, `void Update()` or `Vector3.forward`. In that case
-check the folder is named exactly `sbox` and that `SKILL.md` still has its frontmatter.
+check your agent can actually reach the files, and that `SKILL.md` still has its frontmatter.
 
 <br>
 
@@ -189,9 +234,10 @@ misbehaved and work out why.
 
 ## Talking to it
 
-It triggers on its own, on `.sbproj`, `using Sandbox;`, `PanelComponent`, `[Sync]`,
-`Scene.Trace` and the rest. You never invoke it by name. What changes the output is how you
-ask.
+On a tool that auto-loads skills it triggers by itself, matching `.sbproj`, `using Sandbox;`,
+`PanelComponent`, `[Sync]`, `Scene.Trace` and the rest. Everywhere else your instructions file
+does the same job. Either way you should not have to name it. What changes the output is how
+you ask.
 
 **Name the subsystem** and the right reference opens first.
 
