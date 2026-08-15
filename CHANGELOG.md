@@ -39,6 +39,13 @@ a default project, and both are corrected here.
 - `SKILL.md` taught `await Task.Frame()` unconditionally. It resolves only inside a `Component`,
   where the `Task` property shadows the type with `TaskSource`.
 
+- **`project_type_members` and `project_enum_values` answered about the wrong type.** Both
+  resolved a name with `FirstOrDefault` on the simple name, so asking for `SyncFlags` returned
+  `Sandbox.Terrain+SyncFlags`, a nested enum with two values, rather than `Sandbox.SyncFlags`.
+  Wrong answer, no error, which is the failure class this toolset exists to close. They now
+  prefer an exact full-name match, then a top-level type, and name the alternatives when a
+  simple name is genuinely ambiguous.
+
 ### Added
 - **Seven MCP tools, taking the toolset from 11 to 18.** `project_content_path` and
   `project_content_search` resolve content paths against the mounted filesystem before a typo
@@ -77,6 +84,15 @@ a default project, and both are corrected here.
   caps the skill frontmatter length, and survives paths containing spaces.
 - The skill marks its claims *source*, *editor* or *unverified*. The `Model.Load` error shipped
   because a source read was written with the confidence of a live-verified one.
+
+### Verified
+- All 14 read-only tools called against a live editor over
+  `http://127.0.0.1:7269/mcp`, every one returning `structuredContent`. The 4 tools that mutate
+  editor state were not run, since they start builds or drop caches in an open session.
+- The type-resolution fix above is compile-verified in both nullable configurations but **not**
+  runtime-verified: the editor rebuilt the assembly and kept serving the previous method body,
+  which is the stale-assembly trap this release documents. It needs an editor restart to
+  confirm.
 
 ### Removed
 - `library/ProjectSettings/` stays, but `Tags` does not come back: `ProjectConfig` has no such

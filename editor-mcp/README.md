@@ -157,6 +157,15 @@ input actions: `Input.GetActions()` reads a static field that only `Input.ReadCo
 assigns, and nothing calls it on a settings reload. The tool calls it, and reports the action
 count before and after so you can see the file actually parsed.
 
+**`project_assembly_freshness` compares versions, and version equality is not proof.**
+Observed 2026-08-15: an `Editor/` file was replaced, the editor rebuilt the assembly from
+`0.0.145.0` to `0.0.146.0`, built and loaded agreed, the tool reported `Stale: false`, and the
+MCP registry kept serving the previous method body. The tool answers "is the loaded version
+behind the built one", which is the question it can answer from the outside. It cannot see
+that a registry still holds a `MethodDescription` pointing at replaced code. A clean
+`Stale: false` narrows the problem, it does not close it, and the cure remains closing and
+reopening the editor.
+
 **`project_compilers` reads `Output?.Successful`, not `BuildSuccess`.** The latter is
 `Output?.Successful ?? false`, which cannot tell a build that failed from one that has never
 run. The nullable form can, and the tool reports the difference.

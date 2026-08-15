@@ -86,8 +86,7 @@ public static class SboxMcpServer
 		[Description( "Restrict the listing to one kind of member." )] MemberKind kind = MemberKind.All,
 		[Description( "Maximum members of each kind." )] [Sandbox.Range( 1, 500 )] int limit = 60 )
 	{
-		var found = KnownTypes().FirstOrDefault( candidate => Same( candidate.Name, type ) )
-			?? throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
+		var found = Resolve( type );
 
 		bool Wanted( string memberName ) => string.IsNullOrWhiteSpace( filter ) || Matches( memberName, filter );
 
@@ -186,8 +185,7 @@ public static class SboxMcpServer
 	public static EnumValues EnumValuesOf(
 		[Description( "Exact enum name, for example \"HitboxTags\"." )] string type )
 	{
-		var found = KnownTypes().FirstOrDefault( candidate => Same( candidate.Name, type ) )
-			?? throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
+		var found = Resolve( type );
 
 		if ( !found.IsEnum )
 			throw new Exception( $"\"{found.FullName}\" is a {Shape( found )}, not an enum. Call project_type_members for it instead." );
@@ -702,6 +700,31 @@ public static class SboxMcpServer
 			?? throw new Exception( "EditorTypeLibrary is not available yet. Wait for the editor to finish loading." );
 
 		return library.GetTypes<object>() ?? Enumerable.Empty<TypeDescription>();
+	}
+
+	/// <summary>Resolve a type by simple or full name, preferring a top-level match and naming the alternatives rather than silently answering about the wrong type.</summary>
+	static TypeDescription Resolve( string type )
+	{
+		var matches = KnownTypes()
+			.Where( candidate => Same( candidate.Name, type ) || Same( candidate.FullName, type ) )
+			.ToArray();
+
+		if ( matches.Length == 0 )
+			throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
+
+		if ( matches.Length == 1 )
+			return matches[0];
+
+		var exact = matches.Where( candidate => Same( candidate.FullName, type ) ).ToArray();
+		if ( exact.Length == 1 ) return exact[0];
+
+		// A nested type's FullName carries a '+'. Asking for "SyncFlags" means Sandbox.SyncFlags,
+		// not Terrain's nested one, and picking the first match answered about the wrong type.
+		var topLevel = matches.Where( candidate => candidate.FullName?.Contains( '+' ) != true ).ToArray();
+		if ( topLevel.Length == 1 ) return topLevel[0];
+
+		var names = string.Join( ", ", matches.Select( candidate => candidate.FullName ).Take( 6 ) );
+		throw new Exception( $"\"{type}\" is ambiguous across {matches.Length} types: {names}. Pass a full name." );
 	}
 
 	static string Shape( TypeDescription type )
