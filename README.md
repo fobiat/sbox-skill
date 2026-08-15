@@ -1,14 +1,16 @@
 <div align="center">
 
-# s&box Skill
+<img src="assets/brand/icon-dark.svg" alt="" width="104" height="104">
+
+# s&box Skill and MCP Server
 
 ### Nothing in s&box tells you when you are wrong.
 
-[![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a?style=for-the-badge)](https://sbox.game)
-[![Licence](https://img.shields.io/badge/MIT-3fb950?style=for-the-badge)](LICENSE)
-[![Reference files](https://img.shields.io/badge/17_references-4c8eda?style=for-the-badge)](skills/sbox/references)
-[![MCP tools](https://img.shields.io/badge/18_MCP_tools-e3b341?style=for-the-badge)](editor-mcp)
-[![Devlog](https://img.shields.io/badge/devlog-1F9E7A?style=for-the-badge)](https://fobiat.dev/blog/p/sbox-skill)
+[![Reference files](https://img.shields.io/badge/17_references-2BB88E?style=for-the-badge)](skills/sbox/references)
+[![MCP tools](https://img.shields.io/badge/18_MCP_tools-00A8E8?style=for-the-badge)](editor-mcp)
+[![Engine](https://img.shields.io/badge/s%26box-26.08.05-3E3E3E?style=for-the-badge)](https://sbox.game)
+[![Licence](https://img.shields.io/badge/MIT-3E3E3E?style=for-the-badge)](LICENSE)
+[![Devlog](https://img.shields.io/badge/devlog-3E3E3E?style=for-the-badge)](https://fobiat.dev/blog/p/sbox-skill)
 
 </div>
 
@@ -89,6 +91,68 @@ public sealed class Mover : Component
 ```
 
 Install this and the second one is what you get.
+
+<br>
+
+## The s&box MCP Server
+
+[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eighteen tools onto the
+editor's MCP server. It solves a different silent failure: the editor not noticing you changed
+anything.
+
+Six reasons it might not, none of which raise an error.
+
+| What you changed | Why nothing happened |
+|---|---|
+| `.sbproj` | Read once at editor boot, never watched |
+| `ProjectSettings/*.config` | Cached on first read, never invalidated |
+| A `.cs` file | Compiler watchers stop firing once compilers are recreated |
+| A content path | `Model.Load` returns the error model, not null, so your null check never fires |
+| Nothing, you pulled a branch | The process serves the assembly it loaded at boot |
+| Installed a package over MCP | `install_package` mounts for the session and writes nothing |
+
+Each one leaves you having edited a file, seen no error, and concluding the edit was wrong
+when it simply never arrived.
+
+| | Tools |
+|---|---|
+| **Ask the live engine** | `project_find_type`, `project_type_members`, `project_find_member`, `project_enum_values`, `project_input_actions`, `project_console_commands`, `project_content_path`, `project_content_search` |
+| **Ask the editor** | `project_info`, `project_compilers`, `project_source_changes`, `project_compile_errors`, `project_assembly_freshness`, `project_package_references` |
+| **Change something** | `project_reload_config`, `project_reload_settings`, `project_rebuild`, `project_build` |
+
+The first group inverts this project's own rule. Instead of "if it is in none of the reference
+files it does not exist", you ask the running engine, and that answer cannot go out of date.
+
+### Pointing an agent at it
+
+The server is the editor's, not this project's. It listens on `http://127.0.0.1:7269/mcp`,
+loopback only, while the editor is running.
+
+```bash
+claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
+```
+
+The port is `McpServerPort` in the editor's preferences. It acts on whatever project the editor
+currently has open, never on your shell's working directory.
+
+One thing that reads as a bug and is not: **the toolset never appears in your client's tool
+list.** Listing is gated on an attribute internal to the engine, so only the editor's own seven
+top-level tools are listed and everything else is reached through `search_tools`,
+`describe_toolset` and `call_tool`. Search `project_` and they come back.
+
+Details in [`editor-mcp/README.md`](editor-mcp/README.md). There is also a
+[library project](library) that packages the same file for asset.party, so it can be a package
+reference rather than a copied file.
+
+> **Status:** compiles clean against real engine assemblies in **both** nullable configurations,
+> `enable` and `disable`, each with warnings as errors, verified by
+> [`editor-mcp/compilecheck`](editor-mcp/compilecheck). Both, because a generated `Editor/`
+> project takes that setting from the `.sbproj` field `Nullables`, which defaults to off, and
+> checking only the strict one is how a shipped file compiled here and failed on a drop-in.
+>
+> All 14 read-only tools have been called against a live editor and returned structured data. The
+> 4 that mutate editor state have not, since they start builds in an open session. Report anything
+> that misbehaves and it gets fixed.
 
 <br>
 
@@ -285,55 +349,6 @@ the ones with no equivalent at all, like coroutines.
 > one.
 
 <br>
-
-## The other half: the s&box MCP Server
-
-[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eighteen tools onto the
-editor's MCP server. It solves a different silent failure: the editor not noticing you changed
-anything.
-
-Three reasons it might not, none of which raise an error. The `.sbproj` is read once at boot
-and never watched. `ProjectSettings/*.config` is cached forever on first read. Compiler file
-watchers go stale once the compilers are recreated in-process.
-
-| | Tools |
-|---|---|
-| **Ask the live engine** | `project_find_type`, `project_type_members`, `project_find_member`, `project_enum_values`, `project_input_actions`, `project_console_commands`, `project_content_path`, `project_content_search` |
-| **Ask the editor** | `project_info`, `project_compilers`, `project_source_changes`, `project_compile_errors`, `project_assembly_freshness`, `project_package_references` |
-| **Change something** | `project_reload_config`, `project_reload_settings`, `project_rebuild`, `project_build` |
-
-The first group inverts this project's own rule. Instead of "if it is in none of the reference
-files it does not exist", you ask the running engine, and that answer cannot go out of date.
-
-### Pointing an agent at it
-
-The server is the editor's, not this project's. It listens on `http://127.0.0.1:7269/mcp`,
-loopback only, while the editor is running.
-
-```bash
-claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
-```
-
-The port is `McpServerPort` in the editor's preferences. It acts on whatever project the editor
-currently has open, never on your shell's working directory.
-
-One thing that reads as a bug and is not: **the toolset never appears in your client's tool
-list.** Listing is gated on an attribute internal to the engine, so only the editor's own seven
-top-level tools are listed and everything else is reached through `search_tools`,
-`describe_toolset` and `call_tool`. Search `project_` and they come back.
-
-Details in [`editor-mcp/README.md`](editor-mcp/README.md). There is also a
-[library project](library) that packages the same file for asset.party, so it can be a package
-reference rather than a copied file.
-
-> **Status:** compiles clean against real engine assemblies under the same settings a project's
-> `Editor/` assembly uses, nullable enabled and warnings as errors, verified by
-> [`editor-mcp/compilecheck`](editor-mcp/compilecheck). That proves the C# is sound and every
-> engine member it names resolves. It does not prove the toolset registers and its tools run,
-> which only opening the editor shows. Report anything that misbehaves and it gets fixed.
-
-<br>
-
 ## Layout
 
 ```
