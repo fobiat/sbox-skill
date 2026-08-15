@@ -146,6 +146,24 @@ to make it available in every project.
 </details>
 
 <details>
+<summary><b>Claude Code</b>, as a plugin</summary>
+
+<br>
+
+The repo is its own plugin marketplace, so there is nothing to clone and nothing to copy:
+
+```
+/plugin marketplace add fobiat/sbox-skill
+/plugin install sbox@sbox-skill
+```
+
+The skill triggers on its own frontmatter, and `/plugin update` brings new engine versions with
+it. `editor-mcp/SboxDevTools.cs` comes along in the installed plugin, so the
+[toolset](#the-other-half-sbox_dev) is a file copy away rather than another download.
+
+</details>
+
+<details>
 <summary><b>As a submodule</b>, so <code>git pull</code> brings updates with it</summary>
 
 <br>
@@ -286,7 +304,9 @@ watchers go stale once the compilers are recreated in-process.
 The first group inverts this project's own rule. Instead of "if it is in none of the reference
 files it does not exist", you ask the running engine, and that answer cannot go out of date.
 
-Details in [`editor-mcp/README.md`](editor-mcp/README.md).
+Details in [`editor-mcp/README.md`](editor-mcp/README.md). There is also a
+[library project](library) that packages the same file for asset.party, so it can be a package
+reference rather than a copied file.
 
 > **Status:** compiles clean against real engine assemblies under the same settings a project's
 > `Editor/` assembly uses, nullable enabled and warnings as errors, verified by
@@ -302,6 +322,8 @@ Details in [`editor-mcp/README.md`](editor-mcp/README.md).
 sbox-skill/
 ├── skills/sbox/        the skill, this is what you install
 ├── editor-mcp/         the sbox_dev toolset, a drop-in Editor/ file
+├── library/            the same toolset as an s&box library, for asset.party
+├── .claude-plugin/     marketplace manifest, makes the repo installable
 ├── scripts/            repo tooling, never shipped to your game
 └── .github/workflows/  CI, mirrors the local gate
 ```
