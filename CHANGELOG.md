@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.1] - 2026-08-15
+
+Patch release. `0.1.0` shipped `SboxDevTools.cs` in a state that would not compile in a project
+whose `Editor/` assembly enables nullable reference types and treats warnings as errors.
+
+### Fixed
+- `CS0246` on `Project`, `TypeDescription` and `MethodDescription`. s&box generates an `Editor/`
+  csproj with two *static* usings, which import static members and not the `Sandbox` namespace,
+  so nothing brought those types into scope. Fixed with an explicit `using Sandbox;`.
+- Twelve nullable errors under `TreatWarningsAsErrors`, all in reflection helpers that
+  legitimately return null. Annotated `object?`, `string?`, `PropertyInfo?` and `Type?`.
+
+### Added
+- `editor-mcp/compilecheck/`, a headless compile check against real engine assemblies. It
+  mirrors a real `Editor/` assembly on purpose, nullable on and warnings as errors, because
+  relaxing either is what let the defects above ship.
+
+The skill itself is unchanged.
+
 ## [0.1.0] - 2026-08-15
 
 Initial release. Written against s&box engine **26.08.05**.
