@@ -1,0 +1,23 @@
+name: Coverage gap
+description: An area of the engine the skill does not teach yet.
+labels: ["enhancement"]
+body:
+  - type: input
+    id: area
+    attributes:
+      label: Namespace or subsystem
+      placeholder: Sandbox.VR
+    validations:
+      required: true
+  - type: textarea
+    id: usecase
+    attributes:
+      label: What were you trying to build
+      description: Concrete beats abstract. What did the model get wrong because this was missing?
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Where the truth lives
+      description: Paths into sbox-public, docs pages, or anything else worth reading to write this up.

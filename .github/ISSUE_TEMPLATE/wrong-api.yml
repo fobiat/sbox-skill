@@ -1,0 +1,49 @@
+name: Wrong or missing API
+description: The skill taught an API that does not exist, has the wrong signature, or behaves differently in practice.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the failure that matters most. The whole point of the skill is that
+        a model can trust what it reads here, so a wrong signature is worse than
+        no signature.
+  - type: input
+    id: file
+    attributes:
+      label: Which reference file
+      placeholder: references/networking.md
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Engine version you are on
+      placeholder: "26.08.05"
+    validations:
+      required: true
+  - type: textarea
+    id: claim
+    attributes:
+      label: What the skill says
+      description: Quote the line or table row.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What is actually true
+      description: The real signature or behaviour, and where you confirmed it. A path into sbox-public, a compiler error, or an observed result in a live editor session all count.
+    validations:
+      required: true
+  - type: dropdown
+    id: evidence
+    attributes:
+      label: How did you confirm it
+      options:
+        - Read it in the engine source
+        - Compiler error
+        - Observed live in the editor
+        - Other
+    validations:
+      required: true

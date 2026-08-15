@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: s&box documentation
+    url: https://sbox.game/dev/doc/
+    about: Official engine documentation. Check here before reporting an API as wrong.
+  - name: s&box forums
+    url: https://sbox.game/f/
+    about: Engine questions that are not about this skill.
