@@ -5,32 +5,22 @@
 //  Links    : https://fobiat.dev/   https://github.com/fobiat
 //  Licence  : MIT, see LICENSE at the repository root.
 //
-//  Eleven editor MCP tools in three groups: query the running engine for what an
-//  API really is, read what the editor currently believes, and make it notice a
-//  change on disk. Drop this file into a project's Editor/ folder and the tools
-//  appear under the "sbox_dev" toolset in list_toolsets.
+//  Eleven MCP tools for the s&box editor, in three groups: ask the running engine
+//  what an API really is, ask the editor what it currently believes, and make it
+//  notice a change on disk. Drop this file into a project's Editor/ folder and
+//  they appear under the "sbox_dev" toolset in list_toolsets.
 //
-//  The gap is real and costs whole sessions, because it has three separate
-//  causes and none of them produce an error:
+//  The third group exists because three engine behaviours can each swallow an
+//  edit without raising anything. The .sbproj is read once at boot and never
+//  watched (FN-3). ProjectSettings/*.config is cached on first read and never
+//  invalidated. Compiler file watchers stop firing once the compilers are
+//  recreated in-process (FN-4). Every one leaves you having edited a file, seen
+//  no error, and concluding the edit was wrong when it simply never arrived.
 //
-//    1. The .sbproj is read at editor boot and written from the Project Settings
-//       page. Nothing watches it. An edited Metadata.Compiler block never
-//       reaches Roslyn.                                        (field note FN-3)
-//    2. ProjectSettings/*.config files are cached on first read. An edited
-//       Input.config or Platform.config keeps serving the old values.
-//    3. After compilers are recreated in-process, their source file watchers
-//       have been observed to stop firing, so .cs edits never compile.
-//                                                              (field note FN-4)
-//
-//  In each case an agent edits a file, sees no error, and concludes its change
-//  was wrong. These tools let it check instead of guess.
-//
-//  Most engine members used here are internal, so they are reached by
-//  reflection: editor assemblies are unsandboxed but still sit outside
-//  Sandbox.Engine. Everything is verified against engine 26.08.05. Reflected
-//  members resolve through Required*, which throws the missing name, because
-//  the failure mode of a file like this is silent staleness after an engine
-//  update and a thrown name beats a tool that quietly returns success.
+//  Almost everything worth reaching here is internal, so it goes through the
+//  Engine class at the foot of this file. Editor assemblies are unsandboxed but
+//  still sit outside Sandbox.Engine, so reflection is the only route. Verified
+//  against engine 26.08.05, and compile-checked by editor-mcp/compilecheck.
 // =============================================================================
 
 using System;
@@ -50,10 +40,117 @@ namespace Editor.Mcp;
 [McpToolset( "sbox_dev", "Query the running engine for real type signatures and input actions, read project and compiler state including what each compiler has noticed, list compile errors, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
 public static class SboxDevTools
 {
-	const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
-	const BindingFlags InstanceInternal = BindingFlags.Instance | BindingFlags.NonPublic;
+	// ============================================================ ask the engine
 
-	// ---------------------------------------------------------------- reading
+	/// <summary>
+	/// Search the running engine for a type by name and report what it is. Ask this before
+	/// writing an API you are not certain about. The answer comes from the engine actually
+	/// loaded in the editor, not from documentation, so it cannot be stale and it cannot be
+	/// a plausible invention. No match is a real answer: the type does not exist, so do not
+	/// write it.
+	/// </summary>
+	[McpTool.ReadOnly( "project_find_type" )]
+	public static object FindType(
+		[Description( "Type name or fragment, case insensitive. For example \"SceneTrace\"." )] string name,
+		[Description( "Maximum results. Default 20." )] int limit = 20 )
+	{
+		if ( string.IsNullOrWhiteSpace( name ) )
+			throw new Exception( "Pass a type name or fragment to search for." );
+
+		var matches = KnownTypes()
+			.Where( type => Matches( type.Name, name ) || Matches( type.FullName, name ) )
+			.OrderBy( type => type.Name?.Length ?? int.MaxValue )
+			.Take( Cap( limit ) )
+			.Select( type => new
+			{
+				type.Name,
+				type.Namespace,
+				Kind = Shape( type ),
+				BaseType = type.BaseType?.Name,
+				Methods = type.Methods?.Length ?? 0,
+				Properties = type.Properties?.Length ?? 0,
+				type.Description,
+			} )
+			.ToArray();
+
+		return new
+		{
+			Count = matches.Length,
+			Types = matches,
+			Hint = matches.Length > 0
+				? "Call project_type_members for the full signature list of one of these."
+				: $"Nothing matches \"{name}\" in the loaded engine. Treat that as proof it does not exist rather than as a search that needs rewording.",
+		};
+	}
+
+	/// <summary>
+	/// List a type's methods and properties with real signatures, read from the running
+	/// engine. This is the ground truth an API reference is only an approximation of, so
+	/// prefer it whenever the two might disagree, and always for a type you are about to
+	/// call something unfamiliar on.
+	/// </summary>
+	[McpTool.ReadOnly( "project_type_members" )]
+	public static object TypeMembers(
+		[Description( "Exact type name, for example \"SceneTrace\"." )] string type,
+		[Description( "Only members whose name contains this. Optional." )] string? filter = null,
+		[Description( "Maximum members of each kind. Default 60." )] int limit = 60 )
+	{
+		var found = KnownTypes().FirstOrDefault( candidate => Same( candidate.Name, type ) )
+			?? throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
+
+		bool Wanted( string memberName ) => string.IsNullOrWhiteSpace( filter ) || Matches( memberName, filter );
+
+		return new
+		{
+			Type = found.FullName,
+			Kind = Shape( found ),
+			BaseType = found.BaseType?.FullName,
+
+			Methods = (found.Methods ?? Array.Empty<MethodDescription>())
+				.Where( method => !method.IsSpecialName && Wanted( method.Name ) )
+				.Take( Cap( limit ) )
+				.Select( method => new { method.Name, Signature = Signature( method ), method.Description } )
+				.ToArray(),
+
+			Properties = (found.Properties ?? Array.Empty<PropertyDescription>())
+				.Where( property => Wanted( property.Name ) )
+				.Take( Cap( limit ) )
+				.Select( property => new
+				{
+					property.Name,
+					Type = Readable( property.PropertyType ),
+					Access = property.CanRead && property.CanWrite ? "get set" : property.CanRead ? "get" : "set",
+					property.Description,
+				} )
+				.ToArray(),
+		};
+	}
+
+	/// <summary>
+	/// List the input actions this project defines, with their keyboard and gamepad bindings.
+	/// Input actions are strings resolved at runtime, so Input.Down( "jump" ) on an action that
+	/// does not exist compiles cleanly and silently never fires. Check the name here first.
+	/// </summary>
+	[McpTool.ReadOnly( "project_input_actions" )]
+	public static object InputActions()
+	{
+		var actions = Sandbox.Input.GetActions()?.ToArray() ?? Array.Empty<Sandbox.InputAction>();
+
+		return new
+		{
+			Count = actions.Length,
+			Actions = actions.Select( action => new
+			{
+				action.Name,
+				action.Title,
+				Group = action.GroupName,
+				Keyboard = action.KeyboardCode,
+				Gamepad = action.GamepadCode.ToString(),
+			} ).ToArray(),
+		};
+	}
+
+	// ============================================================ ask the editor
 
 	/// <summary>
 	/// Report which project the editor has open, where it sits on disk, and the compiler
@@ -62,9 +159,9 @@ public static class SboxDevTools
 	/// necessarily what the .sbproj on disk now says.
 	/// </summary>
 	[McpTool.ReadOnly( "project_info" )]
-	public static object ProjectInfo()
+	public static object Info()
 	{
-		var project = CurrentProject();
+		var project = Open();
 
 		return new
 		{
@@ -77,7 +174,7 @@ public static class SboxDevTools
 			project.Broken,
 			project.IsPublished,
 			project.HasCompiler,
-			CompileSettings = ReadCompileSettings( project ),
+			CompileSettings = LiveCompileSettings( project ),
 		};
 	}
 
@@ -87,14 +184,15 @@ public static class SboxDevTools
 	/// a stalled build looks like from the outside.
 	/// </summary>
 	[McpTool.ReadOnly( "project_compilers" )]
-	public static object ProjectCompilers()
+	public static object Compilers()
 	{
-		var project = CurrentProject();
+		var project = Open();
 
 		return new
 		{
-			Compilers = new[] { ReadCompiler( project, "Compiler" ), ReadCompiler( project, "EditorCompiler" ) }
-				.Where( x => x is not null )
+			Compilers = CompilerSlots
+				.Select( slot => Describe( project, slot ) )
+				.Where( description => description is not null )
 				.ToArray(),
 		};
 	}
@@ -106,28 +204,17 @@ public static class SboxDevTools
 	/// edited a .cs file means the watchers are stale: run project_build.
 	/// </summary>
 	[McpTool.ReadOnly( "project_source_changes" )]
-	public static object ProjectSourceChanges()
+	public static object SourceChanges()
 	{
-		var project = CurrentProject();
-
-		object? Summary( string slot )
-		{
-			var compiler = ReflectedProperty( typeof( Project ), slot, InstanceInternal )?.GetValue( project );
-			if ( compiler is null ) return null;
-
-			var summary = ReflectedProperty( compiler.GetType(), "ChangeSummary", InstanceInternal )?.GetValue( compiler );
-
-			return new
-			{
-				Slot = slot,
-				Name = ReadMember( compiler, "Name" ),
-				Changes = summary,
-			};
-		}
+		var project = Open();
 
 		return new
 		{
-			Compilers = new[] { Summary( "Compiler" ), Summary( "EditorCompiler" ) }.Where( x => x is not null ).ToArray(),
+			Compilers = CompilerSlots
+				.Select( slot => Noticed( project, slot ) )
+				.Where( noticed => noticed is not null )
+				.ToArray(),
+
 			Hint = "An empty change set straight after editing a .cs file means the file watchers are stale. Run project_build.",
 		};
 	}
@@ -138,20 +225,19 @@ public static class SboxDevTools
 	/// project builds with TreatWarningsAsErrors, because then a warning is what failed it.
 	/// </summary>
 	[McpTool.ReadOnly( "project_compile_errors" )]
-	public static object ProjectCompileErrors(
+	public static object CompileErrors(
 		[Description( "Include warnings alongside errors. Default false." )] bool includeWarnings = false,
 		[Description( "Maximum rows to return. Default 50." )] int limit = 50 )
 	{
-		var raw = RequiredMethod( typeof( Project ), "GetCompileDiagnostics", StaticInternal )
-			.Invoke( null, null ) as IEnumerable;
+		var raw = Engine.CallShared( typeof( Project ), "GetCompileDiagnostics" ) as IEnumerable;
 
 		var rows = raw is null
 			? Array.Empty<object>()
 			: raw.Cast<object>()
-				.Select( ReadDiagnostic )
-				.Where( d => includeWarnings || d.Severity == "Error" )
-				.OrderBy( d => d.Severity == "Error" ? 0 : 1 )
-				.Take( Math.Max( 1, limit ) )
+				.Select( Flatten )
+				.Where( row => includeWarnings || row.Severity == "Error" )
+				.OrderBy( row => row.Severity == "Error" ? 0 : 1 )
+				.Take( Cap( limit ) )
 				.ToArray<object>();
 
 		return new
@@ -162,118 +248,7 @@ public static class SboxDevTools
 		};
 	}
 
-	/// <summary>
-	/// List the input actions this project defines, with their keyboard and gamepad bindings.
-	/// Input actions are strings resolved at runtime, so Input.Down( "jump" ) on an action that
-	/// does not exist compiles cleanly and silently never fires. Check the name here first.
-	/// </summary>
-	[McpTool.ReadOnly( "project_input_actions" )]
-	public static object ProjectInputActions()
-	{
-		var actions = Sandbox.Input.GetActions()?.ToArray() ?? Array.Empty<Sandbox.InputAction>();
-
-		return new
-		{
-			Count = actions.Length,
-			Actions = actions.Select( a => new
-			{
-				a.Name,
-				a.Title,
-				Group = a.GroupName,
-				Keyboard = a.KeyboardCode,
-				Gamepad = a.GamepadCode.ToString(),
-			} ).ToArray(),
-		};
-	}
-
-	/// <summary>
-	/// Search the running engine for a type by name and report what it is. Ask this before
-	/// writing an API you are not certain about. The answer comes from the engine actually
-	/// loaded in the editor, not from documentation, so it cannot be stale and it cannot be
-	/// a plausible invention. No match is a real answer: the type does not exist, so do not
-	/// write it.
-	/// </summary>
-	[McpTool.ReadOnly( "project_find_type" )]
-	public static object ProjectFindType(
-		[Description( "Type name or fragment, case insensitive. For example \"SceneTrace\"." )] string name,
-		[Description( "Maximum results. Default 20." )] int limit = 20 )
-	{
-		if ( string.IsNullOrWhiteSpace( name ) )
-			throw new Exception( "Pass a type name or fragment to search for." );
-
-		var matches = AllTypes()
-			.Where( t => Contains( t.Name, name ) || Contains( t.FullName, name ) )
-			.OrderBy( t => t.Name?.Length ?? int.MaxValue )
-			.Take( Math.Max( 1, limit ) )
-			.Select( t => new
-			{
-				t.Name,
-				t.Namespace,
-				Kind = TypeKind( t ),
-				BaseType = t.BaseType?.Name,
-				Methods = t.Methods?.Length ?? 0,
-				Properties = t.Properties?.Length ?? 0,
-				t.Description,
-			} )
-			.ToArray();
-
-		return new
-		{
-			Count = matches.Length,
-			Types = matches,
-			Hint = matches.Length == 0
-				? $"Nothing matches \"{name}\" in the loaded engine. Treat that as proof it does not exist rather than as a search that needs rewording."
-				: "Call project_type_members for the full signature list of one of these.",
-		};
-	}
-
-	/// <summary>
-	/// List a type's methods and properties with real signatures, read from the running
-	/// engine. This is the ground truth an API reference is only an approximation of, so
-	/// prefer it whenever the two might disagree, and always for a type you are about to
-	/// call something unfamiliar on.
-	/// </summary>
-	[McpTool.ReadOnly( "project_type_members" )]
-	public static object ProjectTypeMembers(
-		[Description( "Exact type name, for example \"SceneTrace\"." )] string type,
-		[Description( "Only members whose name contains this. Optional." )] string? filter = null,
-		[Description( "Maximum members of each kind. Default 60." )] int limit = 60 )
-	{
-		var target = AllTypes().FirstOrDefault( t => string.Equals( t.Name, type, StringComparison.OrdinalIgnoreCase ) )
-			?? throw new Exception( $"No type named \"{type}\" in the loaded engine. Run project_find_type first." );
-
-		bool Wanted( string memberName ) => string.IsNullOrWhiteSpace( filter ) || Contains( memberName, filter );
-		var cap = Math.Max( 1, limit );
-
-		var methods = (target.Methods ?? Array.Empty<MethodDescription>())
-			.Where( m => !m.IsSpecialName && Wanted( m.Name ) )
-			.Take( cap )
-			.Select( m => new { m.Name, Signature = FormatMethod( m ), m.Description } )
-			.ToArray();
-
-		var properties = (target.Properties ?? Array.Empty<PropertyDescription>())
-			.Where( p => Wanted( p.Name ) )
-			.Take( cap )
-			.Select( p => new
-			{
-				p.Name,
-				Type = FriendlyName( p.PropertyType ),
-				Access = p.CanRead && p.CanWrite ? "get set" : p.CanRead ? "get" : "set",
-				p.Description,
-			} )
-			.ToArray();
-
-		return new
-		{
-			Type = target.FullName,
-			Kind = TypeKind( target ),
-			BaseType = target.BaseType?.FullName,
-			Methods = methods,
-			Properties = properties,
-		};
-	}
-
-	// ---------------------------------------------------------------- writing
+	// ============================================================ change something
 
 	/// <summary>
 	/// Re-read the project's .sbproj from disk into the live config and recreate its compilers,
@@ -283,19 +258,16 @@ public static class SboxDevTools
 	/// the change landed rather than assuming it did.
 	/// </summary>
 	[McpTool( "project_reload_config" )]
-	public static object ProjectReloadConfig()
+	public static object ReloadConfig()
 	{
-		var project = CurrentProject();
+		var project = Open();
 
-		var loaded = RequiredMethod( typeof( Project ), "LoadMinimal", InstanceInternal )
-			.Invoke( project, null ) is true;
-
-		if ( !loaded )
+		if ( Engine.CallOwned( project, "LoadMinimal" ) is not true )
 			throw new Exception( "Reloading the .sbproj failed, most likely a syntax error in it. Check read_console." );
 
-		RequiredMethod( typeof( Project ), "UpdateCompiler", InstanceInternal ).Invoke( project, null );
+		Engine.CallOwned( project, "UpdateCompiler" );
 
-		return new { Reloaded = true, CompileSettings = ReadCompileSettings( project ) };
+		return new { Reloaded = true, CompileSettings = LiveCompileSettings( project ) };
 	}
 
 	/// <summary>
@@ -306,9 +278,9 @@ public static class SboxDevTools
 	/// action count so you can confirm the file parsed.
 	/// </summary>
 	[McpTool( "project_reload_settings" )]
-	public static object ProjectReloadSettings()
+	public static object ReloadSettings()
 	{
-		RequiredMethod( typeof( Sandbox.ProjectSettings ), "ClearCache", StaticInternal ).Invoke( null, null );
+		Engine.CallShared( typeof( ProjectSettings ), "ClearCache" );
 
 		return new
 		{
@@ -325,9 +297,9 @@ public static class SboxDevTools
 	/// unless you specifically want to carry on working while it runs.
 	/// </summary>
 	[McpTool( "project_rebuild" )]
-	public static object ProjectRebuild()
+	public static object Rebuild()
 	{
-		RequiredMethod( typeof( Project ), "RebuildCompilers", StaticInternal ).Invoke( null, null );
+		RecreateCompilers();
 
 		return new
 		{
@@ -342,39 +314,94 @@ public static class SboxDevTools
 	/// the question is simply whether the code compiles.
 	/// </summary>
 	[McpTool( "project_build" )]
-	public static async Task<object> ProjectBuild(
+	public static async Task<object> Build(
 		[Description( "Recreate compilers first, which also resets stale file watchers. Default true." )] bool rebuild = true )
 	{
 		if ( rebuild )
-			RequiredMethod( typeof( Project ), "RebuildCompilers", StaticInternal ).Invoke( null, null );
+			RecreateCompilers();
 
-		var task = RequiredMethod( typeof( Project ), "CompileAsync", StaticInternal ).Invoke( null, null ) as Task
+		var building = Engine.CallShared( typeof( Project ), "CompileAsync" ) as Task
 			?? throw new Exception( "Project.CompileAsync did not return a Task, engine API changed." );
 
-		await task;
+		await building;
 
-		var success = task.GetType().GetProperty( "Result" )?.GetValue( task ) is true;
+		var succeeded = Engine.Peek( building, "Result" ) is true;
 
-		return new { Success = success, Errors = success ? null : ProjectCompileErrors() };
+		return new { Success = succeeded, Errors = succeeded ? null : CompileErrors() };
 	}
 
-	// ---------------------------------------------------------------- helpers
+	// ============================================================ project plumbing
 
-	static Project CurrentProject()
+	static readonly string[] CompilerSlots = { "Compiler", "EditorCompiler" };
+
+	static Project Open()
 	{
 		return Project.Current ?? throw new Exception( "No project is open in the editor." );
 	}
 
-	static bool Contains( string haystack, string needle )
+	static void RecreateCompilers()
 	{
-		return haystack?.Contains( needle, StringComparison.OrdinalIgnoreCase ) == true;
+		Engine.CallShared( typeof( Project ), "RebuildCompilers" );
 	}
+
+	/// <summary>
+	/// The compiler settings Roslyn is using right now, which is the whole point: they can
+	/// differ from the .sbproj on disk, and that difference is usually the bug.
+	/// </summary>
+	static object? LiveCompileSettings( Project project )
+	{
+		if ( project.Config is null ) return null;
+
+		var settings = Engine.CallOwned( project.Config, "GetCompileSettings" );
+		if ( settings is null ) return null;
+
+		return new
+		{
+			TreatWarningsAsErrors = Engine.Peek( settings, "TreatWarningsAsErrors" ),
+			Nullables = Engine.Peek( settings, "Nullables" ),
+			RootNamespace = Engine.Peek( settings, "RootNamespace" ),
+			DefineConstants = Engine.Peek( settings, "DefineConstants" ),
+			NoWarn = Engine.Peek( settings, "NoWarn" ),
+			WarningsAsErrors = Engine.Peek( settings, "WarningsAsErrors" ),
+		};
+	}
+
+	static object? Describe( Project project, string slot )
+	{
+		var compiler = Engine.Hidden( project, slot );
+		if ( compiler is null ) return null;
+
+		return new
+		{
+			Slot = slot,
+			Name = Engine.Peek( compiler, "Name" ),
+			AssemblyName = Engine.Peek( compiler, "AssemblyName" ),
+			IsBuilding = Engine.Peek( compiler, "IsBuilding" ),
+			NeedsBuild = Engine.Peek( compiler, "NeedsBuild" ),
+			BuildSuccess = Engine.Peek( compiler, "BuildSuccess" ),
+		};
+	}
+
+	static object? Noticed( Project project, string slot )
+	{
+		var compiler = Engine.Hidden( project, slot );
+		if ( compiler is null ) return null;
+
+		return new
+		{
+			Slot = slot,
+			Name = Engine.Peek( compiler, "Name" ),
+			Changes = Engine.Hidden( compiler, "ChangeSummary" ),
+		};
+	}
+
+	// ============================================================ type plumbing
 
 	/// <summary>
 	/// The editor's type library rather than the game's, because the game one is only
 	/// populated while a scene is loaded and these tools have to answer at author time.
 	/// </summary>
-	static IEnumerable<TypeDescription> AllTypes()
+	static IEnumerable<TypeDescription> KnownTypes()
 	{
 		var library = Sandbox.Internal.GlobalToolsNamespace.EditorTypeLibrary
 			?? throw new Exception( "EditorTypeLibrary is not available yet. Wait for the editor to finish loading." );
@@ -382,7 +409,7 @@ public static class SboxDevTools
 		return library.GetTypes<object>() ?? Enumerable.Empty<TypeDescription>();
 	}
 
-	static string TypeKind( TypeDescription type )
+	static string Shape( TypeDescription type )
 	{
 		if ( type.IsEnum ) return "enum";
 		if ( type.IsInterface ) return "interface";
@@ -392,87 +419,46 @@ public static class SboxDevTools
 		return "class";
 	}
 
-	static string FormatMethod( MethodDescription method )
+	static string Signature( MethodDescription method )
 	{
-		var args = string.Join( ", ", method.Parameters.Select( p => $"{FriendlyName( p.ParameterType )} {p.Name}" ) );
-		return $"{FriendlyName( method.ReturnType )} {method.Name}( {args} )";
+		var arguments = method.Parameters.Select( p => $"{Readable( p.ParameterType )} {p.Name}" );
+		return $"{Readable( method.ReturnType )} {method.Name}( {string.Join( ", ", arguments )} )";
 	}
 
 	/// <summary>
 	/// Render a generic type the way a person writes it, so List`1 reads as List&lt;Entity&gt;.
 	/// </summary>
-	static string FriendlyName( Type? type )
+	static string Readable( Type? type )
 	{
 		if ( type is null ) return "void";
 		if ( !type.IsGenericType ) return type.Name;
 
-		var args = string.Join( ", ", type.GetGenericArguments().Select( FriendlyName ) );
-		return $"{type.Name.Split( '`' )[0]}<{args}>";
+		var arguments = type.GetGenericArguments().Select( Readable );
+		return $"{type.Name.Split( '`' )[0]}<{string.Join( ", ", arguments )}>";
 	}
 
-	static object? ReadMember( object? target, string name )
-	{
-		return target?.GetType().GetProperty( name )?.GetValue( target );
-	}
-
-	static object? ReadCompileSettings( Project project )
-	{
-		if ( project.Config is null ) return null;
-
-		var settings = RequiredMethod( project.Config.GetType(), "GetCompileSettings", InstanceInternal )
-			.Invoke( project.Config, null );
-
-		if ( settings is null ) return null;
-
-		return new
-		{
-			TreatWarningsAsErrors = ReadMember( settings, "TreatWarningsAsErrors" ),
-			Nullables = ReadMember( settings, "Nullables" ),
-			RootNamespace = ReadMember( settings, "RootNamespace" ),
-			DefineConstants = ReadMember( settings, "DefineConstants" ),
-			NoWarn = ReadMember( settings, "NoWarn" ),
-			WarningsAsErrors = ReadMember( settings, "WarningsAsErrors" ),
-		};
-	}
-
-	static object? ReadCompiler( Project project, string propertyName )
-	{
-		var compiler = RequiredProperty( typeof( Project ), propertyName, InstanceInternal ).GetValue( project );
-		if ( compiler is null ) return null;
-
-		return new
-		{
-			Slot = propertyName,
-			Name = ReadMember( compiler, "Name" ),
-			AssemblyName = ReadMember( compiler, "AssemblyName" ),
-			IsBuilding = ReadMember( compiler, "IsBuilding" ),
-			NeedsBuild = ReadMember( compiler, "NeedsBuild" ),
-			BuildSuccess = ReadMember( compiler, "BuildSuccess" ),
-		};
-	}
+	// ============================================================ diagnostics
 
 	/// <summary>
 	/// Flatten a Roslyn Diagnostic without referencing Microsoft.CodeAnalysis, which editor
 	/// addon code cannot assume is available to it.
 	/// </summary>
-	static DiagnosticRow ReadDiagnostic( object diagnostic )
+	static Diagnostic Flatten( object diagnostic )
 	{
-		var location = ReadMember( diagnostic, "Location" );
-		var span = location?.GetType().GetMethod( "GetLineSpan" )?.Invoke( location, null );
-		var start = ReadMember( span, "StartLinePosition" );
-		var line = ReadMember( start, "Line" ) as int?;
+		var span = Engine.Invoke( Engine.Peek( diagnostic, "Location" ), "GetLineSpan" );
+		var line = Engine.Peek( Engine.Peek( span, "StartLinePosition" ), "Line" ) as int?;
 
-		return new DiagnosticRow
+		return new Diagnostic
 		{
-			Id = ReadMember( diagnostic, "Id" ) as string,
-			Severity = ReadMember( diagnostic, "Severity" )?.ToString(),
+			Id = Engine.Peek( diagnostic, "Id" ) as string,
+			Severity = Engine.Peek( diagnostic, "Severity" )?.ToString(),
 			Message = diagnostic.ToString(),
-			File = ReadMember( span, "Path" ) as string,
-			Line = line is null ? null : line + 1,
+			File = Engine.Peek( span, "Path" ) as string,
+			Line = line + 1,
 		};
 	}
 
-	class DiagnosticRow
+	sealed class Diagnostic
 	{
 		public string? Id { get; set; }
 		public string? Severity { get; set; }
@@ -481,24 +467,64 @@ public static class SboxDevTools
 		public int? Line { get; set; }
 	}
 
-	static MethodInfo RequiredMethod( Type type, string name, BindingFlags flags )
-	{
-		return type.GetMethod( name, flags )
-			?? throw new Exception( $"{type.Name}.{name} not found, engine API changed." );
-	}
+	// ============================================================ small helpers
 
-	static PropertyInfo RequiredProperty( Type type, string name, BindingFlags flags )
-	{
-		return type.GetProperty( name, flags )
-			?? throw new Exception( $"{type.Name}.{name} not found, engine API changed." );
-	}
+	static int Cap( int limit ) => Math.Max( 1, limit );
+
+	static bool Matches( string? haystack, string? needle ) =>
+		needle is not null && haystack?.Contains( needle, StringComparison.OrdinalIgnoreCase ) == true;
+
+	static bool Same( string? a, string? b ) => string.Equals( a, b, StringComparison.OrdinalIgnoreCase );
 
 	/// <summary>
-	/// A reflected member that is allowed to be absent, for optional diagnostics that should
-	/// degrade to null rather than fail the whole call.
+	/// The reflection layer. Editor assemblies are unsandboxed but sit outside Sandbox.Engine,
+	/// so everything internal has to come through here.
+	///
+	/// A lookup that should exist and does not throws the name it wanted. That is deliberate:
+	/// the natural failure of a file like this is silent staleness after an engine update,
+	/// where a renamed member turns a tool into a no-op that still reports success. A thrown
+	/// name is uglier and tells you exactly which member to go and read.
 	/// </summary>
-	static PropertyInfo? ReflectedProperty( Type type, string name, BindingFlags flags )
+	static class Engine
 	{
-		return type.GetProperty( name, flags );
+		const BindingFlags Shared = BindingFlags.Static | BindingFlags.NonPublic;
+		const BindingFlags Owned = BindingFlags.Instance | BindingFlags.NonPublic;
+
+		/// <summary>Call an internal static method, or throw naming it.</summary>
+		public static object? CallShared( Type owner, string name )
+		{
+			return Required( owner.GetMethod( name, Shared ), owner, name ).Invoke( null, null );
+		}
+
+		/// <summary>Call an internal instance method on a target, or throw naming it.</summary>
+		public static object? CallOwned( object target, string name )
+		{
+			var owner = target.GetType();
+			return Required( owner.GetMethod( name, Owned ), owner, name ).Invoke( target, null );
+		}
+
+		/// <summary>Read an internal instance property, or throw naming it.</summary>
+		public static object? Hidden( object target, string name )
+		{
+			var owner = target.GetType();
+			return Required( owner.GetProperty( name, Owned ), owner, name ).GetValue( target );
+		}
+
+		/// <summary>Read a public property that is allowed to be absent, yielding null instead.</summary>
+		public static object? Peek( object? target, string name )
+		{
+			return target?.GetType().GetProperty( name )?.GetValue( target );
+		}
+
+		/// <summary>Call a public method that is allowed to be absent, yielding null instead.</summary>
+		public static object? Invoke( object? target, string name )
+		{
+			return target?.GetType().GetMethod( name )?.Invoke( target, null );
+		}
+
+		static T Required<T>( T? member, Type owner, string name ) where T : MemberInfo
+		{
+			return member ?? throw new Exception( $"{owner.Name}.{name} not found, engine API changed." );
+		}
 	}
 }

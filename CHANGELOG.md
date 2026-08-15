@@ -3,6 +3,25 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.2] - 2026-08-15
+
+Internal refactor of the toolset. **No behaviour change**: all 11 tool names, their read-only
+hints, their parameters and their return shapes are identical, verified by
+`scripts/verify_release.py` and the compile check.
+
+### Changed
+- The reflection plumbing is now one cohesive `Engine` class rather than four loose helpers.
+  Calls read as intent (`Engine.CallShared`, `Engine.CallOwned`, `Engine.Hidden`,
+  `Engine.Peek`, `Engine.Invoke`) instead of `BindingFlags` noise at every site, and the
+  throw-the-missing-name behaviour lives in one place.
+- Tools regrouped into the three that describe them, ask the engine, ask the editor, change
+  something, with the plumbing separated into project, type and diagnostic sections.
+- Method names shortened now that the class name carries the context, so `SboxDevTools.Build()`
+  rather than `ProjectBuild()`. Tool names are public API and are untouched.
+- `Sandbox.Input` and `Sandbox.InputAction` stay explicitly qualified. `Input` alone resolves to
+  a different type inside the `Editor` namespace, which is a compile error rather than a
+  preference.
+
 ## [0.1.1] - 2026-08-15
 
 Patch release. `0.1.0` shipped `SboxDevTools.cs` in a state that would not compile in a project
