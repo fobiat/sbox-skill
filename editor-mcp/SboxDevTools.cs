@@ -40,6 +40,7 @@ using System.ComponentModel;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
+using Sandbox;
 
 namespace Editor.Mcp;
 
@@ -109,7 +110,7 @@ public static class SboxDevTools
 	{
 		var project = CurrentProject();
 
-		object Summary( string slot )
+		object? Summary( string slot )
 		{
 			var compiler = ReflectedProperty( typeof( Project ), slot, InstanceInternal )?.GetValue( project );
 			if ( compiler is null ) return null;
@@ -235,7 +236,7 @@ public static class SboxDevTools
 	[McpTool.ReadOnly( "project_type_members" )]
 	public static object ProjectTypeMembers(
 		[Description( "Exact type name, for example \"SceneTrace\"." )] string type,
-		[Description( "Only members whose name contains this. Optional." )] string filter = null,
+		[Description( "Only members whose name contains this. Optional." )] string? filter = null,
 		[Description( "Maximum members of each kind. Default 60." )] int limit = 60 )
 	{
 		var target = AllTypes().FirstOrDefault( t => string.Equals( t.Name, type, StringComparison.OrdinalIgnoreCase ) )
@@ -400,7 +401,7 @@ public static class SboxDevTools
 	/// <summary>
 	/// Render a generic type the way a person writes it, so List`1 reads as List&lt;Entity&gt;.
 	/// </summary>
-	static string FriendlyName( Type type )
+	static string FriendlyName( Type? type )
 	{
 		if ( type is null ) return "void";
 		if ( !type.IsGenericType ) return type.Name;
@@ -409,12 +410,12 @@ public static class SboxDevTools
 		return $"{type.Name.Split( '`' )[0]}<{args}>";
 	}
 
-	static object ReadMember( object target, string name )
+	static object? ReadMember( object? target, string name )
 	{
 		return target?.GetType().GetProperty( name )?.GetValue( target );
 	}
 
-	static object ReadCompileSettings( Project project )
+	static object? ReadCompileSettings( Project project )
 	{
 		if ( project.Config is null ) return null;
 
@@ -434,7 +435,7 @@ public static class SboxDevTools
 		};
 	}
 
-	static object ReadCompiler( Project project, string propertyName )
+	static object? ReadCompiler( Project project, string propertyName )
 	{
 		var compiler = RequiredProperty( typeof( Project ), propertyName, InstanceInternal ).GetValue( project );
 		if ( compiler is null ) return null;
@@ -473,10 +474,10 @@ public static class SboxDevTools
 
 	class DiagnosticRow
 	{
-		public string Id { get; set; }
-		public string Severity { get; set; }
-		public string Message { get; set; }
-		public string File { get; set; }
+		public string? Id { get; set; }
+		public string? Severity { get; set; }
+		public string? Message { get; set; }
+		public string? File { get; set; }
 		public int? Line { get; set; }
 	}
 
@@ -496,7 +497,7 @@ public static class SboxDevTools
 	/// A reflected member that is allowed to be absent, for optional diagnostics that should
 	/// degrade to null rather than fail the whole call.
 	/// </summary>
-	static PropertyInfo ReflectedProperty( Type type, string name, BindingFlags flags )
+	static PropertyInfo? ReflectedProperty( Type type, string name, BindingFlags flags )
 	{
 		return type.GetProperty( name, flags );
 	}

@@ -1,0 +1,72 @@
+<!--
+  s&box Skill : headless compile check for SboxDevTools.cs
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Licence : MIT, see LICENSE at the repository root.
+
+    dotnet build editor-mcp/compilecheck/compilecheck.csproj -p:SboxManaged=<sbox>/bin/managed/
+
+  Or set SBOX_MANAGED once in the environment.
+
+  This deliberately mirrors a real project's Editor/ assembly rather than being convenient:
+  Nullable is enabled, warnings are errors, and the two static usings are the ones s&box puts
+  in a generated editor csproj. Relaxing any of those would let the file pass here and fail in
+  somebody's editor, which is the failure this exists to prevent.
+
+  What a green run proves: the file is well-formed C# and every engine member it names resolves
+  against real engine assemblies. What it does not prove: that the toolset registers and its
+  tools run. Only opening the editor shows that.
+-->
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>sboxdevtools-compilecheck</AssemblyName>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <DefineConstants>SANDBOX;DEBUG</DefineConstants>
+    <NoWarn>1701;1702;1591</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <SboxManaged Condition="'$(SboxManaged)' == ''">$(SBOX_MANAGED)</SboxManaged>
+  </PropertyGroup>
+
+  <Target Name="RequireSboxManaged" BeforeTargets="BeforeBuild">
+    <Error Condition="'$(SboxManaged)' == ''"
+           Text="Set SboxManaged (or the SBOX_MANAGED environment variable) to your s&amp;box bin/managed/ directory. See the comment at the top of this file." />
+    <Error Condition="!Exists('$(SboxManaged)Sandbox.Tools.dll')"
+           Text="No Sandbox.Tools.dll under '$(SboxManaged)'. That is not an s&amp;box bin/managed/ directory." />
+  </Target>
+
+  <!-- What s&box puts in a generated Editor/ csproj. Not "using Sandbox;", which is why
+       SboxDevTools.cs carries that one explicitly. -->
+  <ItemGroup>
+    <Using Include="Sandbox.Internal.GlobalToolsNamespace" Static="true" />
+    <Using Include="Sandbox.Internal.GlobalGameNamespace" Static="true" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="../SboxDevTools.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Sandbox.System"><HintPath>$(SboxManaged)Sandbox.System.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Engine"><HintPath>$(SboxManaged)Sandbox.Engine.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Tools"><HintPath>$(SboxManaged)Sandbox.Tools.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Reflection"><HintPath>$(SboxManaged)Sandbox.Reflection.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Filesystem"><HintPath>$(SboxManaged)Sandbox.Filesystem.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Access"><HintPath>$(SboxManaged)Sandbox.Access.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Services"><HintPath>$(SboxManaged)Sandbox.Services.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Event"><HintPath>$(SboxManaged)Sandbox.Event.dll</HintPath></Reference>
+    <Reference Include="Sandbox.Bind"><HintPath>$(SboxManaged)Sandbox.Bind.dll</HintPath></Reference>
+    <Reference Include="Sandbox.NetCore"><HintPath>$(SboxManaged)Sandbox.NetCore.dll</HintPath></Reference>
+  </ItemGroup>
+
+</Project>

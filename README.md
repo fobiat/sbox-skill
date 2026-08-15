@@ -288,9 +288,11 @@ files it does not exist", you ask the running engine, and that answer cannot go 
 
 Details in [`editor-mcp/README.md`](editor-mcp/README.md).
 
-> **Status:** every engine member the toolset reaches is verified present in 26.08.05 by file
-> and line, but it has not yet been compiled against a live editor. Report anything that does
-> not load and it gets fixed quickly.
+> **Status:** compiles clean against real engine assemblies under the same settings a project's
+> `Editor/` assembly uses, nullable enabled and warnings as errors, verified by
+> [`editor-mcp/compilecheck`](editor-mcp/compilecheck). That proves the C# is sound and every
+> engine member it names resolves. It does not prove the toolset registers and its tools run,
+> which only opening the editor shows. Report anything that misbehaves and it gets fixed.
 
 <br>
 

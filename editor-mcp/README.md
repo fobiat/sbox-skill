@@ -149,6 +149,23 @@ needs rewording.
 
 ---
 
+## Verifying it before you trust it
+
+```bash
+SBOX_MANAGED=/path/to/sbox/bin/managed/ dotnet build compilecheck/compilecheck.csproj
+```
+
+That compiles `SboxDevTools.cs` against real engine assemblies using the same settings s&box
+puts in a generated `Editor/` project: nullable enabled, warnings as errors, and the two static
+global-namespace usings rather than a blanket `using Sandbox;`. Those settings are deliberate.
+Relaxing any of them would let the file pass here and fail in somebody's editor, which is the
+exact failure this is meant to catch.
+
+Green proves the C# is sound and every engine member it names resolves. It does not prove the
+toolset registers or that its tools run, which only opening the editor shows.
+
+---
+
 ## How it breaks, and why that is deliberate
 
 Most of what these tools touch is `internal`, so it is reached by reflection. Every reflected
