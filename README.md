@@ -237,6 +237,32 @@ That third rule is what the field notes exist for.
 
 ---
 
+## Bonus: the `sbox_dev` editor MCP toolset
+
+[`editor-mcp/SboxDevTools.cs`](editor-mcp/SboxDevTools.cs) is a drop-in file for your
+project's `Editor/` folder. It adds six MCP tools to the editor's embedded server, covering
+the one thing the stock toolsets do not: getting source you edited on disk to actually
+compile.
+
+Two engine behaviours make that harder than it sounds. Nothing watches the `.sbproj` for
+external edits, so a changed `Metadata.Compiler` block never reaches Roslyn. And after
+compilers are recreated in-process, their source file watchers have been observed to stop
+firing. In both cases you edit, see no error, and get no effect.
+
+| Tool | Does |
+|---|---|
+| `project_info` | What is open, and the compiler settings **live in memory** rather than on disk |
+| `project_compilers` | Per-compiler `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
+| `project_compile_errors` | Diagnostics as rows with file and line, no console scraping |
+| `project_reload_config` | Re-read an externally edited `.sbproj` into the live config |
+| `project_rebuild` | Recreate compilers and start a build, returns immediately |
+| `project_build` | Rebuild and wait, then report success plus errors |
+
+Full details, including every reflected engine member and where it lives upstream, in
+[`editor-mcp/README.md`](editor-mcp/README.md).
+
+---
+
 ## Field notes: the part you cannot get from docs
 
 Most of this skill records what the API **is**, read out of engine source. One file records
