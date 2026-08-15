@@ -8,6 +8,7 @@
 [![Licence](https://img.shields.io/badge/MIT-3fb950?style=for-the-badge)](LICENSE)
 [![Reference files](https://img.shields.io/badge/16_references-4c8eda?style=for-the-badge)](skills/sbox/references)
 [![MCP tools](https://img.shields.io/badge/11_MCP_tools-e3b341?style=for-the-badge)](editor-mcp)
+[![Devlog](https://img.shields.io/badge/devlog-1F9E7A?style=for-the-badge)](https://fobiat.dev/blog/p/sbox-skill)
 
 </div>
 
