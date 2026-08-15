@@ -13,7 +13,7 @@
       "name": "sbox",
       "source": "./",
       "description": "Teaches a coding agent the real s&box API from 17 source-verified reference files, so it stops writing Unity patterns into a Source 2 project. Covers the scene system, components, Razor UI, networking, input and physics, editor extensions, services, avatars, rendering, audio, ActionGraph and VR. Every API is traceable to engine source at version 26.08.05. Ships the s&box MCP Server editor toolset alongside it.",
-      "version": "0.4.0",
+      "version": "0.5.0",
       "category": "game-development",
       "keywords": [
         "sbox",

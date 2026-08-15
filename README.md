@@ -6,6 +6,7 @@
 
 ### Nothing in s&box tells you when you are wrong.
 
+[![Released on sbox.game](https://img.shields.io/badge/sbox.game-released-F59C1A?style=for-the-badge)](https://sbox.game/fobiat/sbox_mcp_server/)
 [![Reference files](https://img.shields.io/badge/17_references-2BB88E?style=for-the-badge)](skills/sbox/references)
 [![MCP tools](https://img.shields.io/badge/18_MCP_tools-00A8E8?style=for-the-badge)](editor-mcp)
 [![Engine](https://img.shields.io/badge/s%26box-26.08.05-3E3E3E?style=for-the-badge)](https://sbox.game)
@@ -23,17 +24,20 @@
 > it works with any agent that can read a file. Every API in it is traceable to engine source at
 > a named version.
 >
-> **The toolset** is one C# file for your `Editor/` folder that adds 18 tools to the editor's
-> MCP server. It answers the questions the editor otherwise leaves silent: does this type
-> actually exist, has the compiler noticed my edit, why did nothing happen when I changed that
-> config.
+> **The toolset** adds 18 tools to the editor's MCP server. It answers the questions the editor
+> otherwise leaves silent: does this type actually exist, has the compiler noticed my edit, why
+> did nothing happen when I changed that config. Install it as a package reference,
+> [`fobiat.sbox_mcp_server`](https://sbox.game/fobiat/sbox_mcp_server/), or drop the single C#
+> file into your `Editor/` folder.
 
 <br>
 
-> **On the two words.** The package is called **s&box MCP Server**. Strictly it is a
-> *toolset*: s&box ships the MCP server inside the editor, on `127.0.0.1:7269`, and this
-> registers into it rather than starting anything. Both words appear below and they mean
-> different things: the **server** is the editor's, the **toolset** is what this adds to it.
+> **On the two words.** The asset.party listing is called
+> **[s&box MCP Server & AI Skill](https://sbox.game/fobiat/sbox_mcp_server/)**. Strictly the
+> second half is a *toolset*: s&box ships the MCP server inside the editor, on
+> `127.0.0.1:7269`, and this registers into it rather than starting anything. Both words appear
+> below and they mean different things: the **server** is the editor's, the **toolset** is what
+> this adds to it.
 
 <br>
 
@@ -103,9 +107,11 @@ Install this and the second one is what you get.
 
 ## The s&box MCP Server
 
-[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eighteen tools onto the
-editor's MCP server. It solves a different silent failure: the editor not noticing you changed
-anything.
+Published on asset.party as
+**[`fobiat.sbox_mcp_server`](https://sbox.game/fobiat/sbox_mcp_server/)**, or
+[one file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder. Either way, eighteen tools
+onto the editor's MCP server. It solves a different silent failure: the editor not noticing you
+changed anything.
 
 Six reasons it might not, none of which raise an error.
 
@@ -147,9 +153,23 @@ list.** Listing is gated on an attribute internal to the engine, so only the edi
 top-level tools are listed and everything else is reached through `search_tools`,
 `describe_toolset` and `call_tool`. Search `project_` and they come back.
 
-Details in [`editor-mcp/README.md`](editor-mcp/README.md). There is also a
-[library project](library) that packages the same file for asset.party, so it can be a package
-reference rather than a copied file.
+### Installing it
+
+Two ways, and they install the same code.
+
+**As a package**, if you want updates to arrive with the editor's own package flow. Open Project
+Settings, add `fobiat.sbox_mcp_server` to package references, restart. The
+[library project](library) that builds that package lives in this repo.
+
+**As a file**, if you would rather read every line of an unsandboxed `Editor/` assembly before
+it compiles into your project, which is a reasonable thing to want:
+
+```powershell
+Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
+```
+
+Restart the editor either way, then run `list_toolsets`. Details in
+[`editor-mcp/README.md`](editor-mcp/README.md).
 
 > **Status:** compiles clean against real engine assemblies in **both** nullable configurations,
 > `enable` and `disable`, each with warnings as errors, verified by
@@ -160,6 +180,10 @@ reference rather than a copied file.
 > All 14 read-only tools have been called against a live editor and returned structured data. The
 > 4 that mutate editor state have not, since they start builds in an open session. Report anything
 > that misbehaves and it gets fixed.
+>
+> Published to asset.party on **2026-08-15**, which settles the one question engine source could
+> not answer: a library whose only content is an unsandboxed `Editor/` assembly is accepted, and
+> loads into a consuming project from a package reference.
 
 <br>
 
@@ -231,7 +255,7 @@ The repo is its own plugin marketplace, so there is nothing to clone and nothing
 
 The skill triggers on its own frontmatter, and `/plugin update` brings new engine versions with
 it. `editor-mcp/SboxMcpServer.cs` comes along in the installed plugin, so the
-[toolset](#the-other-half-the-sbox-mcp-server) is a file copy away rather than another download.
+[toolset](#the-sbox-mcp-server) is a file copy away rather than another download.
 
 </details>
 

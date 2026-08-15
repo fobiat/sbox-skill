@@ -15,10 +15,12 @@ close the loop: write, verify, build, read the real error.
 You can run either alone. This walks through both. For the long version, every tool explained
 and the reasoning behind each, see the [in-depth guide](GUIDE.md).
 
-> **On the two words.** The package is called **s&box MCP Server**. Strictly it is a
-> *toolset*: s&box ships the MCP server inside the editor, on `127.0.0.1:7269`, and this
-> registers into it rather than starting anything. Both words appear below and they mean
-> different things: the **server** is the editor's, the **toolset** is what this adds to it.
+> **On the two words.** The asset.party listing is called
+> **[s&box MCP Server & AI Skill](https://sbox.game/fobiat/sbox_mcp_server/)**. Strictly the
+> second half is a *toolset*: s&box ships the MCP server inside the editor, on
+> `127.0.0.1:7269`, and this registers into it rather than starting anything. Both words appear
+> below and they mean different things: the **server** is the editor's, the **toolset** is what
+> this adds to it.
 
 
 <br>
@@ -30,6 +32,9 @@ git clone https://github.com/fobiat/sbox-skill.git
 ```
 
 Nothing to build. The skill is plain markdown, the toolset is one C# file.
+
+Installing the toolset from asset.party instead? You still want the clone, because the skill
+half is not in the package. Step 3 has both routes.
 
 <br>
 
@@ -73,6 +78,13 @@ file it routes you to. Do not write an API that is not in those files.
 
 ## 3. Install the toolset
 
+**From asset.party.** Open Project Settings, add `fobiat.sbox_mcp_server` to package
+references, restart. The listing is
+[s&box MCP Server & AI Skill](https://sbox.game/fobiat/sbox_mcp_server/).
+
+**Or as a file**, if you would rather read an unsandboxed `Editor/` assembly before it compiles
+into your project:
+
 ```powershell
 New-Item -ItemType Directory -Force your-game\Editor | Out-Null
 Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
@@ -88,9 +100,9 @@ cp sbox-skill/editor-mcp/SboxMcpServer.cs your-game/Editor/
 </details>
 
 `Editor/` is a separately compiled assembly, not an `#if EDITOR` block in your game code. That
-is what lets it reach engine internals.
+is what lets it reach engine internals, and it is why reading the file first is reasonable.
 
-Restart the editor.
+Restart the editor either way.
 
 <br>
 

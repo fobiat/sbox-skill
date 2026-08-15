@@ -94,14 +94,15 @@ file it routes you to. Do not write an API that is not in those files.
 
 ### The toolset
 
-One file into your project's `Editor/` folder:
+As a package reference: open Project Settings, add `fobiat.sbox_mcp_server`, restart. The
+listing is [s&box MCP Server & AI Skill](https://sbox.game/fobiat/sbox_mcp_server/).
+
+Or one file into your project's `Editor/` folder:
 
 ```powershell
 New-Item -ItemType Directory -Force your-game\Editor | Out-Null
 Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
 ```
-
-Or as a package reference, `fobiat.sbox_mcp_server`, added in Project Settings.
 
 `Editor/` matters. It is a separately compiled assembly that s&box builds **without** the BCL
 whitelist it applies to gameplay code, which is what lets the toolset reach engine internals at

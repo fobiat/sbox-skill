@@ -5,7 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-15
+
+**The MCP Server half is published.**
+[`fobiat.sbox_mcp_server`](https://sbox.game/fobiat/sbox_mcp_server/) is live on asset.party,
+so installing it is a package reference in Project Settings rather than a copied file. The
+file-drop install is unchanged and stays supported.
+
+Nothing in the skill or the toolset behaves differently. This release is the publish, the
+listing art, and the documentation catching up to both.
+
 ### Added
+- **The package.** Published 2026-08-15 as `fobiat.sbox_mcp_server`, 54.8 KB, listed as *s&box
+  MCP Server & AI Skill*. That answers the question engine source could not: asset.party does
+  accept a library whose only content is an unsandboxed `Editor/` assembly.
 - **Listing art for the asset.party page**, in `assets/brand/listing/`: five 1920x1080
   screenshots, a loading screen, and two 1080p30 explainer videos. `assets/brand/thumb-tall.png`
   joins the wide thumbnail, at 512x910 for the site's 9:16 slot.
@@ -14,11 +27,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   engine bump is a re-run rather than a session in an image editor. Pillow for the images,
   `imageio-ffmpeg` for the videos, no system ffmpeg needed.
 
+### Fixed
+- **`editor-mcp/README.md` advertised eleven tools on its badge**, three releases after the
+  count reached eighteen.
+- **A dead anchor in `README.md`**, pointing at a heading renamed in 0.4.0.
+
 ### Changed
 - **The two halves are named the MCP Server and the AI Agent Skill on the listing.** The word
   "toolset" stays in this repository, where it draws a real distinction from the editor's own
   server, and no longer appears on the store page, where it only invited the question. The
   `.sbproj` title, both thumbnails and all listing art follow the new naming.
+- **Every install path now leads with the package reference**, in `README.md`, `QUICKSTART.md`,
+  `GUIDE.md` and `editor-mcp/README.md`. The file drop is kept alongside it rather than
+  demoted, since reading an unsandboxed `Editor/` file before it compiles into your project is
+  a reasonable thing to want.
+- **`library/README.md` records the publish** rather than describing it as untested, and keeps
+  the listing's title, summary and tags so the art can be regenerated to match.
 
 ## [0.4.0] - 2026-08-15
 

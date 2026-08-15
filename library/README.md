@@ -1,8 +1,10 @@
 # s&box MCP Server as an s&box code library
 
 This directory packages the [s&box MCP Server toolset](../editor-mcp) as a **library** project,
-so it can be published to asset.party and pulled in as a package reference instead of copied
-file by file.
+published to asset.party and pulled in as a package reference instead of copied file by file.
+
+**Live at [sbox.game/fobiat/sbox_mcp_server](https://sbox.game/fobiat/sbox_mcp_server/)** since
+2026-08-15, listed as *s&box MCP Server & AI Skill*.
 
 Install becomes: open Project Settings, add `fobiat.sbox_mcp_server` to package references,
 restart.
@@ -28,9 +30,10 @@ on `Config.Type == "game" || Config.Type == "addon"`. A library that depends on 
 will not get the editor code. That is fine for the intended use and would not be if you were
 building tooling on top of it.
 
-**Publishing is untested.** Everything above is read from engine source. Whether asset.party's
-publish flow accepts a library whose only content is an unsandboxed editor assembly is a policy
-question that source cannot answer. Publish it once and find out before relying on it.
+**The policy question is now answered.** Everything above is read from engine source, which
+could say what the engine does but not what asset.party allows. A library whose only content is
+an unsandboxed editor assembly **is** accepted: the package published on 2026-08-15, 54.8 KB,
+and the page reads Released.
 
 ## Layout
 
@@ -58,21 +61,23 @@ its own project root, so this is a copy rather than a link, kept honest by two t
 `python3 scripts/sync_library.py` after editing the canonical file, and
 `scripts/verify_release.py` fails the build if the two ever differ.
 
-## Publishing it
+## Republishing it
+
+The same four steps run again for every update.
 
 1. Add this directory as a project in the s&box editor. It should appear under Libraries.
 2. Check the toolset still registers: `list_toolsets` should show `sbox_mcp_server` with eighteen
    tools.
 3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_mcp_server`. The
-   listing takes its display name from `Title`, so it reads **s&box MCP Server**; the
+   listing takes its display name from `Title`, so it reads **s&box MCP Server & AI Skill**; the
    description, tags and thumbnail are filled in on the site, not in the project file.
 4. In a **separate game or addon project**, add `fobiat.sbox_mcp_server` to package references,
    restart the editor, and run `list_toolsets` again.
 
-Step 4 is the one that decides this. Loading from a package is a different path from loading a
-local `Editor/` folder, and only step 4 exercises it. If the tools do not appear there, the
-file-drop install in [`editor-mcp/README.md`](../editor-mcp/README.md) is still the supported
-path and nothing is lost.
+Step 4 is the one that decides an update. Loading from a package is a different code path from
+loading a local `Editor/` folder, and only step 4 exercises it. If the tools do not appear
+there, the file-drop install in [`editor-mcp/README.md`](../editor-mcp/README.md) is still the
+supported path and nothing is lost.
 
 ## The listing art
 
@@ -94,6 +99,14 @@ On the page the two halves are called the **MCP Server** and the **AI Agent Skil
 *toolset* is this repository's, and it earns its place here because the distinction from the
 editor's own server is real. On a store listing it only invites the question, so the art does
 not use it.
+
+The listing's own copy, for reference when regenerating it:
+
+| Field | Value |
+|---|---|
+| Title | s&box MCP Server & AI Skill |
+| Summary | 18 MCP tools for the s&box editor, and 17 reference files that stop an AI agent writing Unity code into your Source 2 project. |
+| Tags | agent, ai, api, automation, claude, code, development, editor, library, llm, mcp, mcpserver, reference, tool, tools, workflow |
 
 A library consuming this library will not get the editor code either way, per the reference
 loop gate described above.

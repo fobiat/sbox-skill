@@ -37,14 +37,16 @@ SELF = "scripts/verify_release.py"
 # disappears breaks anyone who scripted against it. Docs are checked against the
 # names parsed from the C#, never against this set.
 BASELINE_TOOLS = {
-    "project_find_type", "project_type_members", "project_input_actions",
+    "project_find_type", "project_type_members", "project_find_member", "project_enum_values",
+    "project_input_actions", "project_console_commands", "project_content_path",
+    "project_content_search",
     "project_info", "project_compilers", "project_source_changes", "project_compile_errors",
+    "project_assembly_freshness", "project_package_references",
     "project_reload_config", "project_reload_settings", "project_rebuild", "project_build",
 }
 
-BASELINE_READONLY = {
-    "project_find_type", "project_type_members", "project_input_actions",
-    "project_info", "project_compilers", "project_source_changes", "project_compile_errors",
+BASELINE_READONLY = BASELINE_TOOLS - {
+    "project_reload_config", "project_reload_settings", "project_rebuild", "project_build",
 }
 
 # Documents that present the toolset as a catalogue, so every tool has to appear

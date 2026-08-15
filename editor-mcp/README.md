@@ -4,12 +4,13 @@
 
 **Eighteen MCP tools for the s&box editor, for when you edit a file and nothing happens.**
 
-[![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a?style=flat-square)](https://sbox.game)
+[![Released](https://img.shields.io/badge/sbox.game-released-f59c1a?style=flat-square)](https://sbox.game/fobiat/sbox_mcp_server/)
+[![Engine](https://img.shields.io/badge/s%26box-26.08.05-3e3e3e?style=flat-square)](https://sbox.game)
 [![Licence](https://img.shields.io/badge/licence-MIT-3fb950?style=flat-square)](../LICENSE)
-[![Tools](https://img.shields.io/badge/tools-11-e3b341?style=flat-square)](SboxMcpServer.cs)
+[![Tools](https://img.shields.io/badge/tools-18-00a8e8?style=flat-square)](SboxMcpServer.cs)
 [![Single file](https://img.shields.io/badge/install-1_file-4c8eda?style=flat-square)](SboxMcpServer.cs)
 
-*One file. Drop it in `Editor/`, restart, done.*
+*A package reference, or one file in `Editor/`. Restart, done.*
 
 </div>
 
@@ -54,6 +55,13 @@ listing is gated on an attribute internal to the engine, so these are reached th
 <br>
 
 ## Quickstart
+
+**As a package.** Open Project Settings, add `fobiat.sbox_mcp_server` to package references,
+restart. Nothing to clone, and the editor's own package flow brings updates. The
+[library project](../library) that builds it is in this repo.
+
+**As a file**, if you would rather read an unsandboxed `Editor/` assembly before it compiles
+into your project:
 
 ```bash
 mkdir -p your-game/Editor
