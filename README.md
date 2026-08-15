@@ -6,8 +6,8 @@
 
 [![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a?style=for-the-badge)](https://sbox.game)
 [![Licence](https://img.shields.io/badge/MIT-3fb950?style=for-the-badge)](LICENSE)
-[![Reference files](https://img.shields.io/badge/16_references-4c8eda?style=for-the-badge)](skills/sbox/references)
-[![MCP tools](https://img.shields.io/badge/11_MCP_tools-e3b341?style=for-the-badge)](editor-mcp)
+[![Reference files](https://img.shields.io/badge/17_references-4c8eda?style=for-the-badge)](skills/sbox/references)
+[![MCP tools](https://img.shields.io/badge/18_MCP_tools-e3b341?style=for-the-badge)](editor-mcp)
 [![Devlog](https://img.shields.io/badge/devlog-1F9E7A?style=for-the-badge)](https://fobiat.dev/blog/p/sbox-skill)
 
 </div>
@@ -16,12 +16,12 @@
 
 > **In short.** Two things for building [s&box](https://sbox.game) games, either usable on its own.
 >
-> **The skill** is 16 reference files that teach a coding agent the real s&box API, so it stops
+> **The skill** is 17 reference files that teach a coding agent the real s&box API, so it stops
 > writing Unity code into your Source 2 project. Plain markdown, no runtime, no dependencies, so
 > it works with any agent that can read a file. Every API in it is traceable to engine source at
 > a named version.
 >
-> **The toolset** is one C# file for your `Editor/` folder that adds 11 tools to the editor's
+> **The toolset** is one C# file for your `Editor/` folder that adds 18 tools to the editor's
 > MCP server. It answers the questions the editor otherwise leaves silent: does this type
 > actually exist, has the compiler noticed my edit, why did nothing happen when I changed that
 > config.
@@ -48,7 +48,7 @@ Every one of these compiles. Every one of these looks right in review.
 | `NetworkSpawn()` | Ownership goes to whoever called it, not the host. A world object now belongs to one random client |
 | `[Sync]` on a scene object | `NetworkMode.Snapshot` is the default and does not live-replicate. RPCs keep working perfectly, which is what makes it so hard to spot |
 | A client writing `[Sync(SyncFlags.FromHost)]` | Discarded before it reaches the backing field. No exception, and the read-back on the next line already shows the authoritative value |
-| `Model.Load( "typo/path.vmdl" )` | Returns `null`, not the error placeholder. Only an empty path gives you the checkerboard you were expecting |
+| `Model.Load( "typo/path.vmdl" )` | Comes back as the engine's error model, non-null with `IsError` set, so the null check everyone writes is a branch that can never fire and the world ships orange with a clean console |
 
 None of these are exotic. They are all first-week code.
 
@@ -287,7 +287,7 @@ the ones with no equivalent at all, like coroutines.
 
 ## The other half: the s&box MCP Server
 
-[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eleven tools onto the
+[One file](editor-mcp/SboxMcpServer.cs) into your `Editor/` folder, eighteen tools onto the
 editor's MCP server. It solves a different silent failure: the editor not noticing you changed
 anything.
 
@@ -297,12 +297,29 @@ watchers go stale once the compilers are recreated in-process.
 
 | | Tools |
 |---|---|
-| **Ask the live engine** | `project_find_type`, `project_type_members`, `project_input_actions` |
-| **Ask the editor** | `project_info`, `project_compilers`, `project_source_changes`, `project_compile_errors` |
+| **Ask the live engine** | `project_find_type`, `project_type_members`, `project_find_member`, `project_enum_values`, `project_input_actions`, `project_console_commands`, `project_content_path`, `project_content_search` |
+| **Ask the editor** | `project_info`, `project_compilers`, `project_source_changes`, `project_compile_errors`, `project_assembly_freshness`, `project_package_references` |
 | **Change something** | `project_reload_config`, `project_reload_settings`, `project_rebuild`, `project_build` |
 
 The first group inverts this project's own rule. Instead of "if it is in none of the reference
 files it does not exist", you ask the running engine, and that answer cannot go out of date.
+
+### Pointing an agent at it
+
+The server is the editor's, not this project's. It listens on `http://127.0.0.1:7269/mcp`,
+loopback only, while the editor is running.
+
+```bash
+claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
+```
+
+The port is `McpServerPort` in the editor's preferences. It acts on whatever project the editor
+currently has open, never on your shell's working directory.
+
+One thing that reads as a bug and is not: **the toolset never appears in your client's tool
+list.** Listing is gated on an attribute internal to the engine, so only the editor's own seven
+top-level tools are listed and everything else is reached through `search_tools`,
+`describe_toolset` and `call_tool`. Search `project_` and they come back.
 
 Details in [`editor-mcp/README.md`](editor-mcp/README.md). There is also a
 [library project](library) that packages the same file for asset.party, so it can be a package

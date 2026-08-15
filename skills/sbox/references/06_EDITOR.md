@@ -638,14 +638,133 @@ names seen in the stock editor: `"scene.saved"`, `"scene.play"`, `"scene.stop"`,
 
 ---
 
-## 8. Hammer / MapEditor: no documented extension surface
+## 8. Hammer / MapEditor: `Editor.MapDoc` and `Editor.MapEditor`
 
-`engine/Sandbox.Tools/MapEditor/` (68 files: `Hammer.cs`, `HammerMainWindow.cs`,
-`NativeHammer.cs`, `MapDoc/`, ...) is the internal implementation of the level editor.
-It has no `[HammerTool]`-style attribute or documented extension point analogous to
-`[EditorTool]` or `[Dock]` for third-party addons. Don't invent one. If a task needs
-Hammer-specific extensibility, that's unverified territory; say so rather than
-guessing an API.
+Hammer is scriptable. `Editor.MapDoc` and `Editor.MapEditor` are public, carry shipped XML
+summaries, and live in `Sandbox.Tools.dll`, which every addon's `Editor/` assembly already
+references (`Project.Compiling.cs:347`). You reach them the same way you reach `Widget` or
+`AssetSystem`: from `Editor/`, with `using Editor.MapDoc;` or `using Editor.MapEditor;`.
+
+What there is *not* is a `[HammerTool]` registration attribute in the shape of
+`[EditorTool]` or `[Dock]`. Registration happens through the singleton `Instance` /
+`IToolFactory` properties below, which native Hammer calls into. Don't invent an attribute.
+
+### `Editor.MapDoc`: the document tree
+
+`MapDocument` (`MapDoc/MapDocument.cs`) is one open `.vmap`: `PathName`, `World`
+(a `MapWorld`), `DeleteNode( MapNode )`. Get the current one from `Hammer.ActiveMap`.
+
+`MapNode` (`MapDoc/Nodes/MapNode.cs:25`) is the base of everything in the tree:
+`Name`, `TypeString`, `Position`, `Angles`, `Scale`, `Parent`, `Children`
+(`IEnumerable<MapNode>`), `Visible`, `World`, `Copy()`, `Remove()`,
+`GeneratesEntityModelGeometry`.
+
+| Node type | What it is |
+|:--|:--|
+| `MapWorld` (sealed) | The root. Also exposes `Scene`, `HammerSceneEditorSession EditorSession`, `MapPathName` |
+| `MapEntity` (sealed) | A point or brush entity: `ClassName`, `GetKeyValue( key )` / `SetKeyValue( key, value )`, `SerializedObject`, `MapClass`, `TypeDescription`, `SetDefaultBounds( min, max )` |
+| `MapGameObject` (sealed) | A `GameObject` embedded in the map. Exposes `GameObject` |
+| `MapMesh` | Brush geometry: `SetMaterial( Material )`, `ConstructFromPolygons( PrimitiveBuilder.PolygonMesh )`, `GetFaceMaterialAssets()` |
+| `MapStaticOverlay` (sealed) | A `MapMesh` decal: `CreateCenteredQuad( Vector2 size, Material material )` |
+| `MapGroup` (sealed) | A grouping node |
+| `MapInstance` (sealed) | A referenced sub-map: `Target` |
+| `MapPath` / `MapPathNode` (both sealed) | Path entities and their points |
+
+Every constructible node takes `MapDocument mapDocument = null` and defaults to
+`Hammer.ActiveMap` when you pass nothing (`MapDoc/Nodes/MapEntity.cs:29-34`). Its sibling
+`TransformFlags` / `TransformOperationMode` enums and the `TransformOperationScope` struct
+are `internal`, so brush transforms recorded as one Hammer operation are not reachable from
+an addon. Build geometry with `ConstructFromPolygons` and place the node instead.
+
+### `Editor.MapEditor`: the editor itself
+
+`Hammer` (`Hammer.cs:8`, `static partial class`) is the entry point: `ActiveMap`,
+`MapAsset`, `Open`, `Window`, `CurrentMaterial`, `SetCurrentMaterial( Asset )`,
+`ReloadFromFile()`, plus the asset-browser glue `SelectObjectsUsingAsset( Asset )`,
+`SelectFacesUsingMaterial( Asset )`, `AssignAssetToSelection( Asset )`,
+`ShowEntityReportForAsset( Asset )`.
+
+`Selection` (`MapDoc/Selection.cs:14`, static) is the selection set: `All`
+(`IEnumerable<MapNode>`), `Add`, `Set`, `Remove`, `Clear`, `SelectAll`,
+`InvertSelection`, `PivotPosition`, `SelectMode`, and the `OnChanged` event.
+
+`History` (`History.cs:10`, static) is undo: `MarkUndoPosition( string name )`,
+`Keep( MapNode )` for a node you are about to change, `KeepNew( MapNode )` for one you
+just made. Same manual pairing discipline as `SceneEditorSession.UndoScope`.
+
+`MapView` (`MapView.cs:16`) is one 3D viewport: `SceneCamera`, `GizmoInstance`, `MapDoc`,
+`MousePosition`, `BuildRay( out Vector3 startRay, out Vector3 endRay )`.
+
+`HammerSession` (`HammerSession.cs:11`) wraps one open map: `MapAsset`, `MapDocument`,
+`CompiledMapPath` (the `.vpk` the `.vmap` compiles to).
+
+Also `HammerSceneEditorSession` (Hammer's `Scene.ISceneEditorSession` implementation),
+`HammerSourceLocation`, `HammerMainWindow`, `HammerManagedInspector`, and the abstract
+`EditorContext` / `EntityObject`. Hammer's `Trace` and `TraceResult` structs are plain
+`Editor`, not `Editor.MapEditor` (`MapEditor/Trace.cs:5`). The stock drop targets
+(`MapViewDropTarget`, `ModelDropTarget`, `MaterialDropTarget`, `EntityDropTarget`) and
+`HammerEvents` are all `internal`: read them in source for the shape, don't call them.
+
+### Extending Hammer: the four interfaces
+
+These are the actual extension points. Native Hammer calls into whatever you assign to the
+static `Instance` property, so registration is an assignment, not an attribute.
+
+```csharp
+// Tools/BlockTool.cs:10, Tools/EntityTool.cs:6, :18, Tools/PathTool.cs:8
+public interface IBlockTool
+{
+    static IBlockTool Instance { get; set; }
+    PrimitiveBuilder Current { get; set; }
+    bool   InProgress { get; set; }
+    string EntityOverride { get; set; }
+    Widget BuildUI();
+    static void UpdateTool();                 // redraw after a parameter change
+    static bool OrientPrimitives { get; set; }
+}
+
+public interface IToolFactory                 // one tool instance per Hammer session
+{
+    static IToolFactory Instance { get; set; }
+    IEntityTool CreateEntityTool();
+    IPathTool   CreatePathTool();
+}
+
+public interface IEntityTool
+{
+    void   CreateUI( Widget container );
+    string GetCurrentEntityClassName();
+    static void StartBlockEntityCreation( string className );
+}
+
+public interface IPathTool
+{
+    void   CreateUI( Widget container );
+    string GetCurrentEntityClassName();
+    float  GetRadiusOffset();
+    bool   IsRadiusOffsetEnabled();
+}
+```
+
+Drag-and-drop into a viewport is the fifth, and the only one that *is* attribute-driven.
+`IMapViewDropTarget` (`DragDrop/IMapViewDropTarget.cs:24`) has `DragEnter( Asset, MapView )`,
+`DragEnter( Package, MapView )`, `DragMove`, `DragDropped`, `DragLeave`,
+`DrawGizmos( MapView )`, all with default implementations. Register it with
+`[CanDrop( "packageTypeOrExtension" )]` (`:6`), which is `AllowMultiple = true`, so one
+target can claim several package types or file extensions.
+
+### `Editor.MapEditor.EntityDefinitions`
+
+28 public types describing the stock Hammer entities: `HammerEntityDefinition` (the base),
+`PointLightEntity`, `SpotLightEntity`, `EnvironmentLightEntity`, `OrthoLightEntity`,
+`CapsuleLightEntity`, `RectangleLightEntity`, `LightProbe`, `CombinedLightProbe`, `Cubemap`,
+`CubemapBox`, `GradientFogEntity`, `HammerCubemapFog`, `HammerVolumetricFogVolume`,
+`VolumetricFogController`, `PropStaticEntity`, `PropPhysicsEntity`, `PropAnimated`,
+`FuncBrushEntity`, `SkyCameraEntity`, `SpawnPointEntity`, `SoundEventEntity`,
+`SoundEventBoxEntity`, `SoundScapeEntity`, `SoundScapeBoxEntity`, `CommentEntity`,
+`InfoOverlayEntity`, `InfoCullTrianglesEntity`. Read these for the shape a Hammer entity
+class takes and for the enums they nest (`ShadowType`, `DirectLightMode`,
+`IndirectLightMode`, `VolumetricFogType`, `LightSourceShape`, `BakeLightingChoices`, ...).
 
 ---
 

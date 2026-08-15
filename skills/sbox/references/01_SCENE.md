@@ -236,6 +236,79 @@ State Changes:
 
 **You cannot count on the relative order the same callback fires in across different GameObjects.** Nothing guarantees it stays stable run to run. If one object's callback genuinely needs to run before another's, put that dependency into a `GameObjectSystem` with its explicit stage and order controls, rather than hoping component ordering cooperates.
 
+### `OnEnabled` Runs After Every `OnAwake` in the Batch
+
+What *is* guaranteed, and what surprises people, is the ordering *between* hooks across a whole
+batch. Lifecycle callbacks are deferred into a `CallbackBatch` and executed in
+`CommonCallback` enum order, one whole group at a time
+(`Scene/GameObject/CallbackBatch.cs:180-195`):
+
+```
+Deserialize → Validate → Loading → Awake → Enable → Dirty → Disable → Destroy → Term
+```
+
+Loading a scene or instantiating a prefab creates one batch, so **every `OnAwake` in that batch
+runs before the first `OnEnabled`**. Not per component, per batch. A component's `OnEnabled` can
+therefore see objects whose `OnAwake` has run but whose `OnEnabled` has not.
+
+The practical consequence is the scene-singleton pattern:
+
+```csharp
+// WRONG: two components in the same batch both see the static as null in OnAwake
+static MyDirector _instance;
+protected override void OnAwake()
+{
+    if ( _instance is null ) _instance = this;
+}
+```
+
+Resolve through a scene query with the static as a **cache**, never the static alone. The
+fallback branch has to be able to find an instance that already exists but has not registered
+itself yet:
+
+```csharp
+static MyDirector _cached;
+
+public static MyDirector Get( Scene scene )
+{
+    if ( _cached.IsValid() && _cached.Scene == scene )
+        return _cached;
+
+    _cached = scene.GetAllComponents<MyDirector>().FirstOrDefault();
+    return _cached;
+}
+```
+
+Otherwise the fallback quietly builds a second instance, and you get two directors, two sets of
+subscriptions, and doubled output with nothing logged.
+
+### A `static readonly` Built From a Lambda Does Not Survive a Hotload
+
+Hotload migrates static fields by assigning the new type's field
+(`Sandbox.Hotload/UpdateReferences.cs:400-490`). A `readonly` field cannot be assigned, so
+`newField.IsInitOnly` sends it down an in-place-upgrade path instead (`:456-467`), and the
+delegate upgrader refuses in-place upgrades outright:
+
+```csharp
+// Sandbox.Hotload/Upgraders/DelegateUpgrader.cs:338-346
+protected override bool OnTryUpgradeInstance( object oldInstance, object newInstance, bool createdElsewhere )
+{
+    if ( createdElsewhere )
+    {
+        // We can't do in-place delegate upgrades, we always want to make a new instance if
+        // anything has changed
+        return false;
+    }
+    ...
+}
+```
+
+So a `static readonly Func<...>`, `Action<...>`, `Comparison<T>` or `Predicate<T>` built from a
+lambda or a method group is the one static shape hotload will not fix up, and editing the
+lambda's body leaves you looking at behaviour that does not match the source in front of you.
+Use a plain mutable `static` field, or a `static` property with an expression body that is
+re-evaluated on each call.
+
 ***
 
 ## Opt-In Component Interfaces
@@ -370,6 +443,99 @@ Here's how the stock controller wires all of this together (`PlayerController.In
 - **`UseLookControls = false` silently disables pressing as a side effect.**
   `UpdateLookAt()` only runs inside that same branch, so switching off look controls drags
   pressing down with it.
+
+#### The Press Pipeline, Exactly
+
+Four details in `PlayerController.Pressing.cs` decide whether a pressable behaves, and none of
+them are guessable.
+
+**1. Three widening passes, each shorter than the last.** `TryGetLookedAt` is one loop
+(`:212-263`):
+
+```csharp
+for ( float f = 0.0f; f <= 4.0f; f += 2.0f )
+{
+    var hits = Scene.Trace
+        .Ray( EyePosition, EyePosition + EyeAngles.Forward * (ReachLength - f) )
+        .IgnoreGameObjectHierarchy( GameObject )
+        .Radius( f )
+        .HitTriggers()
+        .RunAll();
+    ...
+}
+```
+
+Radius 0 at full reach, then radius 2 at `ReachLength - 2`, then radius 4 at `ReachLength - 4`.
+The fat passes trade reach for forgiveness, and they only run if the thin pass found nothing.
+
+**2. A non-trigger collider ends that pass's hit loop; a trigger does not.** The last statement
+of the per-hit body is (`:257-261`):
+
+```csharp
+// If we hit a non-trigger and found nothing pressable, we should stop
+if ( hit.Collider is null || !hit.Collider.IsTrigger )
+    break;
+```
+
+So a `BoxCollider` with `IsTrigger = true` is the tool for **widening a pressable's reach
+without blocking anything behind it**: put an oversized trigger box around a small lever and the
+walk keeps going past it if the player was aiming at something else. A solid collider in front
+of a pressable stops the pass dead, which is what keeps players from pressing through walls.
+
+**3. `GetTooltip` is called unconditionally, even after `CanPress` returned false**
+(`:241-252`):
+
+```csharp
+var canPress = c.CanPress( @event );
+
+if ( c.GetTooltip( @event ) is { } tt )
+{
+    tt.Enabled = tt.Enabled && canPress;
+    tt.Pressable = c;
+    Tooltips.Add( tt );
+}
+
+if ( !canPress )
+    continue;
+```
+
+A refusing pressable still authors its own refusal text. That is the design: return a tooltip
+saying "Locked" or "Need a keycard" from `GetTooltip` and let the engine grey it out via
+`Enabled`. Do not guard `GetTooltip` on `CanPress`; if you do, a refused interaction shows
+nothing at all and the player has no idea why.
+
+**4. `StartPressing` does not press the component the hover walk chose.** The hover walk returns
+the first `IPressable` that *passes* `CanPress`, skipping refusers. `StartPressing` then throws
+that away and re-resolves from the GameObject (`:148`):
+
+```csharp
+var pressable = obj.GetComponent<IPressable>();
+```
+
+`Component.GetComponent<T>()` is `Components.Get<T>( includeDisabled: false )`, which returns the
+**first enabled match in component insertion order** (`ComponentList.cs:309-339`), not the one
+the hover walk picked, and with no `CanPress` filtering in the search itself. On a GameObject
+carrying two `IPressable` components, the one you hovered and the one you press can be different
+objects. Keep it to one `IPressable` per GameObject.
+
+**5. `Hovered` is stale for the whole duration of a press.** `UpdateLookAt` opens with
+`Tooltips.Clear()` and then forks (`:23-37`):
+
+```csharp
+public void UpdateLookAt()
+{
+    Tooltips.Clear();
+    if ( !EnablePressing ) return;
+    if ( Pressed.IsValid() ) { UpdatePressed(); return; }
+    UpdateHovered();
+}
+```
+
+While `Pressed` is valid, `UpdateHovered` never runs, so `SwitchHovered` never runs and
+`Hovered` keeps whatever it held when the press began. HUD code that reads `Hovered` during a
+held press is reading a stale value. Read `Pressed` instead, and rebuild the prompt from
+`Tooltips`, which *is* refreshed every frame (`UpdatePressed` re-adds the pressed object's
+tooltip at `:56-60`).
 
 See `13_EXAMPLES.md` → *Example 11* for a complete worked version.
 

@@ -3,14 +3,22 @@ name: CI
 on:
   push:
     branches: ["**"]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   check:
     name: Skill structure
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0 so verify_release.py can reach the tags it compares against
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -20,11 +28,44 @@ jobs:
         run: python3 scripts/check_skill.py
 
       - name: Verify both deliverables are complete and leak nothing
-        run: python3 scripts/verify_release.py
+        env:
+          RELEASE: ${{ github.ref_type == 'tag' }}
+        run: |
+          if [ "$RELEASE" = "true" ]; then
+            python3 scripts/verify_release.py
+          else
+            python3 scripts/verify_release.py --allow-unreleased
+          fi
+
+  # Self-hosted, so it compiles against a real s&box install. The repository is
+  # public, and a self-hosted runner on a public repository is arbitrary code
+  # execution on the host for anyone who can open a pull request. The condition
+  # below is the only thing preventing that: a fork PR never reaches this job.
+  # Do not relax it, and do not add pull_request_target anywhere in this file.
+  #
+  # Set the repository variable SBOX_SELF_HOSTED to "true" once a runner is
+  # registered. Until then the job is skipped rather than queued, so nothing
+  # waits on a runner that does not exist. The runner needs the .NET SDK, Python
+  # and SBOX_MANAGED set in its machine environment.
+  compile:
+    name: Headless compile check
+    runs-on: [self-hosted, windows]
+    if: >-
+      vars.SBOX_SELF_HOSTED == 'true'
+      && (github.event_name == 'push'
+      || github.event_name == 'workflow_dispatch'
+      || github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile SboxMcpServer.cs with Nullable enabled and disabled
+        run: python editor-mcp/compilecheck/run.py
 
   notify-discord:
     name: Notify Discord
     runs-on: ubuntu-latest
+    # Deliberately not waiting on compile: that job is skipped until a runner is
+    # registered, and a skipped dependency would report as a failure here.
     needs: [check]
     if: always()
     steps:

@@ -35,7 +35,29 @@ What you see up front is a small slice. The full tool registry lives across edit
 | `call_tool` / `call_tools` | Call a single tool, or several in one batch |
 | `read_console` | The editor's log output, including errors and exceptions |
 
-A failed tool call still comes back as a normal result carrying **`isError`**, never a protocol-level error, so read the result instead of expecting an exception.
+A failed tool call comes back as a normal result carrying **`isError`**, so read the result instead of expecting an exception. That covers everything *inside* a tool. Two paths above the tool layer do produce real JSON-RPC errors, and a client that assumes there are none will mis-handle them: an unrecognised method returns `MethodNotFound`, and `tools/call` without a `name` returns `InvalidParams` (`McpServer.cs`, `Handle` and `ToolsCall`). At the HTTP layer, a malformed body is a `400` carrying `ParseError`, and a JSON-RPC batch array is a `400` carrying `InvalidRequest`.
+
+### Connecting
+
+The server is embedded in the editor process and starts with it, on by default.
+
+| Fact | Value |
+| :-- | :-- |
+| Default port | **7269** (`EditorPreferences.McpServerPort`, an editor cookie) |
+| URL | `http://127.0.0.1:7269/mcp` (`McpServer.Url`) |
+| Binding | Loopback only: `127.0.0.1` and `localhost`, nothing else |
+| Origin check | A request carrying a non-loopback `Origin` header gets `403`, guarding against DNS rebinding |
+| Method | `POST` only. `GET` and `DELETE` return `405` with `Allow: POST` |
+| Path | Exactly `/mcp`. Anything else is a clean `404` |
+| Body cap | **8 MiB**, enforced on the read itself rather than trusting `Content-Length` |
+| Batching | JSON-RPC arrays are rejected outright: `"Batching is not supported"` |
+| Protocol versions | `2025-11-25`, `2025-06-18`, `2025-03-26`, `2024-11-05`; an unknown request gets the newest |
+
+**Capabilities are tools and nothing else.** `initialize` answers with
+`{"tools": {"listChanged": false}}` and no other capability key: **no resources, no prompts, no
+progress notifications, and no SSE**. There is no server-initiated stream and no session, which
+is why `GET` is refused. Do not wait on a progress event that will never arrive; a long tool call
+simply holds its HTTP response open until it returns.
 
 ### What Ships Built In (engine 26.08.05)
 
@@ -49,10 +71,25 @@ A failed tool call still comes back as a normal result carrying **`isError`**, n
 | `play` | `play_start`, `play_stop`, `play_pause` |
 | `log` | `log_info`, `log_warning`, `log_error` |
 
-A project registers its own toolset by putting `[McpToolset]` on a static class in its `Editor/` folder and `[McpTool]` on the static methods inside it. The method's XML summary becomes the description an agent reads when deciding whether to call the tool, so write that sentence for a reader rather than as documentation. `[McpTool.ReadOnly]` marks a tool that never changes state, which lets a client run it without prompting the user. Tools run on the main thread, may return a `Task` to go async, and their return value is serialized to JSON.
+A project registers its own toolset by putting `[McpToolset]` on a static class in its `Editor/` folder and `[McpTool]` on the static methods inside it. The method's XML summary becomes the description an agent reads when deciding whether to call the tool, so write that sentence for a reader rather than as documentation. `[McpTool.ReadOnly]` marks a tool that never changes state. Tools run on the main thread, may return a `Task` to go async, and their return value is serialized to JSON.
+
+> **A client's `tools/list` contains 7 of those 52 tools, and a third-party toolset can never
+> appear in it.** `ToolRegistry.ListJson()` emits only methods carrying `[McpListed]`
+> (`Mcp/ToolRegistry.cs:51-64`), and `McpListedAttribute` is **`internal` to the engine**
+> (`Mcp/McpListedAttribute.cs:11`) on purpose, so a list a client fetched once never goes stale
+> as code hotloads. The seven are `editor_status`, `read_console`, `list_toolsets`,
+> `describe_toolset`, `search_tools`, `call_tool` and `call_tools`. **Everything else, including
+> every tool in the table above beyond those seven and every tool your own project registers, is
+> reachable only through `search_tools` / `describe_toolset` and then `call_tool`.**
+>
+> One consequence: **`readOnlyHint` never reaches a client's tool list for an addon tool.** The
+> annotation is written in `ToolJson` (`ToolRegistry.cs:115-123`), which `tools/list` only calls
+> for `[McpListed]` tools, so a client's own read-only detection cannot see it. Assume every
+> addon tool is treated as a destructive write by the client, which is the protocol's default
+> for an unknown tool.
 
 This skill ships one such toolset, `sbox_mcp_server`, as a drop-in file at
-`editor-mcp/SboxMcpServer.cs` in its own repository. Eleven tools, in three groups.
+`editor-mcp/SboxMcpServer.cs` in its own repository. Eighteen tools, in three groups.
 
 Working around the traps recorded below: `project_reload_config` re-reads an externally
 edited `.sbproj`, `project_reload_settings` drops the cached `ProjectSettings` so
@@ -60,19 +97,35 @@ edited `.sbproj`, `project_reload_settings` drops the cached `ProjectSettings` s
 and `project_build` does that and waits for the result.
 
 Seeing what the editor thinks is true: `project_info`, `project_compilers`,
-`project_source_changes` (what each compiler has actually noticed since its last build) and
-`project_compile_errors`.
+`project_source_changes` (what each compiler has actually noticed since its last build),
+`project_compile_errors`, `project_assembly_freshness` (whether the process is still serving
+an older assembly than the one on disk, which a rebuild does not cure) and
+`project_package_references` (the `.sbproj` list against what is actually installed, since
+`install_package` mounts for the session and writes nothing).
 
 **Checking an API against the running engine rather than against this skill:**
 `project_find_type` and `project_type_members` query the live `TypeLibrary` and return real
-signatures. Prefer them to any file here when the two could disagree, because the engine
-cannot be out of date and a reference file eventually will be. `project_input_actions` does
-the same job for input action names, which are runtime strings that fail silently when
-misspelled.
+signatures, with `[Obsolete]` members marked. Prefer them to any file here when the two could
+disagree, because the engine cannot be out of date and a reference file eventually will be.
+`project_find_member` searches every loaded type at once, for when you know roughly what a
+method is called but not what it hangs off. `project_enum_values` answers for an enum, which
+`project_type_members` cannot, since an enum has no methods or properties and reports zero of
+both. `project_input_actions` and `project_console_commands` do the same job for the two string
+surfaces that fail silently when misspelled.
+
+**Checking a content path before it fails at runtime:** `project_content_path` resolves one
+against the mounted filesystem and `project_content_search` lists what is actually there.
+`Model.Load` hands back the engine's error model rather than null for a path nothing provides,
+so an authored typo builds clean, passes every headless test and ships an orange world.
 
 ### How the Registry Behaves
 
-- Pagination uses `limit` / `offset`, and an out-of-range value clamps instead of throwing.
+- Pagination uses `limit` / `offset`, and **only `limit` clamps**. Clamping is
+  `ApplyRange`, which does nothing unless the parameter carries a `[Range]` attribute
+  (`Mcp/ToolRegistry.cs:285-298`). Every `limit` in the built-in registry has one; **no `offset`
+  anywhere does** (`AssetSystem.cs:25`, `Packages.cs:20`), so an offset past the end is your
+  problem, not the server's. The server's own `instructions` blurb says out-of-range values
+  clamp; that is true for `limit` and overstated for `offset`.
 - Vectors and angles travel as **comma-separated strings**, never arrays: a position is
   `"x,y,z"`, a view angle is `"pitch,yaw,roll"`.
 - The coordinate system is Source's: 1 unit equals 1 inch, +x is forward, +y is left, +z is up, angles in degrees.
@@ -80,9 +133,9 @@ misspelled.
   `asset_search` hands back.
 - Any tool that edits the scene pushes its own undo step.
 
-### Two Traps That Cost a Session Each
+### Three Traps That Cost a Session Each
 
-Both are ledger rows, and both cost a session to find, so save yourself the rediscovery.
+All three are ledger rows, and each cost a session to find, so save yourself the rediscovery.
 
 **1. External edits to `.sbproj` / `.config` files go unnoticed.** (ledger FN-3,
 live-verified 2026-08-07.) The `.sbproj` gets read once, at editor boot, and from then on
@@ -90,20 +143,51 @@ the only writer the engine recognizes is its own in-editor Project Settings page
 watches the file for outside changes. Change `Metadata.Compiler` on disk and the
 compilers just keep building against that stale config forever, silently, with no rebuild
 and no warning that anything's wrong. The way out is a `project_reload_config`-style tool
-(internally: `Project.LoadMinimal()` then `Project.UpdateCompiler()`, both
-engine-internal calls) or restarting the editor outright.
+(internally: `Project.LoadMinimal()`, which is `internal`, then `Project.UpdateCompiler()`,
+which is **`private`** at `Project.Compiling.cs:44`, so reaching it needs reflection or a
+public path that calls it) or restarting the editor outright.
 
-**2. Recreating the compilers in-process kills the source file watchers.** (ledger FN-4,
-live-verified 2026-08-07.) Before a reload, saving a `.cs` file kicks off a compile
-immediately. After one, edits and new files under `Code/` and `Editor/` produced **no
-build for 15+ seconds**, with `NeedsBuild` sitting at false the entire time. Nothing was
-wrong as far as `compile_status` was concerned, since it just reports the last build that
-actually succeeded, so the picture looked healthy while your edit sat uncompiled.
+**2. After recreating the compilers, source edits stopped triggering builds.**
+(ledger FN-4, live-verified 2026-08-07. **Observed behaviour, unconfirmed mechanism.**)
+Before the reload, saving a `.cs` file kicked off a compile immediately. After one, edits and
+new files under `Code/` and `Editor/` produced **no build for 15+ seconds**, with `NeedsBuild`
+reading false the entire time and `compile_status` looking healthy throughout.
 
-> **Rule of thumb:** after *any* batch of source edits made outside the editor, call
-> `project_rebuild` (which runs a full `RebuildCompilers()`), then poll `compile_status`
-> until `IsBuilding` flips false and check `Success` on each compiler. Silence is not
-> proof of a successful build.
+The observation is real. The explanation this file used to give, that recreating the compilers
+kills the source file watchers, is **not supported by the source** and has been withdrawn:
+
+- `Project.Static.cs:69` clears `proj.lastCompilerHash = default` before `UpdateCompiler()`, so
+  the hash short-circuit at `Project.Compiling.cs:52` cannot skip the rebuild.
+- `CompileGroup.CreateCompiler` calls `compiler.MarkForRecompile()` on the new compiler
+  (`CompileGroup.cs:117`), so `NeedsBuild` should be **true**, not false.
+- Both compiler setup paths end with a watcher: `Project.Compiling.cs:175`
+  (`Compiler.WatchForChanges()`) and `:388` (`EditorCompiler.WatchForChanges()`).
+
+Whatever actually happened, the cheaper remedy is to re-arm rather than to dispose and rebuild
+the whole `CompileGroup`. **`Compiler.MarkForRecompile()` (`Compiler.cs:322`) and
+`Compiler.WatchForChanges()` (`Compiler.Watch.cs:10`) are both `public`**, so a tool can call
+them directly on an existing compiler without touching the group at all.
+
+> **Rule of thumb:** after *any* batch of source edits made outside the editor, force the
+> rebuild explicitly (`project_rebuild`, which runs a full `RebuildCompilers()`), then poll
+> `compile_status` until `IsBuilding` flips false and check `Success` on each compiler. Silence
+> is not proof of a successful build.
+
+**3. Recompiling does not cure a stale assembly. Only restarting the editor does.** This one is
+worse than the other two, because every instrument reads green while it is happening.
+
+The editor process serves whatever it loaded at boot. **No hotload fires for an external change
+to the source tree**, and a `git merge`, a branch switch, a `git stash pop` or a bulk edit from
+another tool is exactly that. Neither a rebuild nor a config reload cures it. Stopping play mode
+first changes nothing. `compile_status` reports green throughout, because it is reporting on the
+last build that succeeded, which it did. The symptom is code behaving like the version you
+replaced: a method you deleted still running, a fix you merged still absent, a type you renamed
+still resolving under its old name.
+
+> **Never judge freshness by `compile_status`. Judge it by a runtime marker.** Put a version
+> string or a build stamp somewhere the running game logs, and read it back through
+> `read_console` or a `[ConCmd]` (see `17_CONSOLE.md`). If the marker is stale, close the editor
+> and reopen it; nothing short of that will help, and every minute spent rebuilding is wasted.
 
 ***
 

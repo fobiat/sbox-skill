@@ -5,6 +5,85 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-15
+
+A full audit against the decompiled engine and `sbox-public`, then the fixes it found. **Update
+if you use either half.** The skill taught one fact backwards and the toolset did not compile in
+a default project, and both are corrected here.
+
+### Fixed
+- **`SboxMcpServer.cs` now carries `#nullable enable`.** Without it the file emitted 21
+  `CS8632` errors in any project whose `.sbproj` does not set `Nullables`, which is the default.
+  Every user with `TreatWarningsAsErrors` on hit this. The drop-in is now self-sufficient
+  regardless of the host project's settings.
+- **`Model.Load` guidance was inverted, in four places.** The skill said an unresolvable path
+  returns `null` and shipped the recipe `if ( model is null )`. A non-blank path that resolves
+  to nothing comes back as the engine's **error model**: non-null, `IsError` set. So the
+  documented check was a branch that can never fire, and `authored ?? Model.Load( fallback )`
+  cannot fall back. Both outcomes are possible, so the guidance is now
+  `model is null || model.IsError`. Corrected in `SKILL.md`, `15_API_CORE.md`,
+  `13_EXAMPLES.md` and `README.md`.
+- **`project_reload_settings` could not do what it claimed.** It cleared the `ProjectSettings`
+  cache and told you to confirm with `project_input_actions`, which would report stale actions
+  forever: `Input.GetActions()` reads a static assigned only by `Input.ReadConfig`. It now calls
+  that, and reports the action count before and after.
+- **`project_reload_config` could silently no-op.** `UpdateCompiler()` early-returns on an
+  unchanged `CompilerHash`, while the tool still reported the freshly-loaded settings, so it
+  looked like it worked. It now clears the cached hash and reports whether compilers were
+  actually recreated.
+- `15_API_CORE.md` presented seven `[Obsolete]` `GameTransform` members as current API. Under
+  `TreatWarningsAsErrors` each is a build failure.
+- `06_EDITOR.md` claimed Hammer and MapEditor have no documented extension surface. There are 56
+  public documented types across `Editor.MapDoc`, `Editor.MapEditor` and its `EntityDefinitions`.
+- `02_COMPONENTS.md` named `Terrain.HeightMapSize`, which does not exist.
+- `SKILL.md` taught `await Task.Frame()` unconditionally. It resolves only inside a `Component`,
+  where the `Task` property shadows the type with `TaskSource`.
+
+### Added
+- **Seven MCP tools, taking the toolset from 11 to 18.** `project_content_path` and
+  `project_content_search` resolve content paths against the mounted filesystem before a typo
+  silently loads the error model. `project_assembly_freshness` reports when the process is
+  serving an older assembly than the one on disk, which a rebuild does not cure and
+  `compile_status` reports as green. `project_package_references` reconciles the `.sbproj`
+  against what is installed, since `install_package` writes nothing. `project_console_commands`,
+  `project_find_member` and `project_enum_values` close gaps in what could be asked of the
+  engine.
+- `references/17_CONSOLE.md`, the `[ConCmd]` and `[ConVar]` surface, which had one incidental
+  mention across the whole skill.
+- **How to actually connect an agent to the editor.** Port 7269,
+  `claude mcp add --transport http sbox http://127.0.0.1:7269/mcp`. This was documented nowhere,
+  which made half of `QUICKSTART.md` unperformable.
+- `SECURITY.md`, plus `toolset-bug.yml` and `feature-request.yml` issue templates.
+- Windows install commands throughout. Every command in the repo was POSIX, for a Windows-only
+  engine, and `QUICKSTART.md` step 2 failed outright on a missing `mkdir`.
+- New coverage: `MoveMode`, `ICameraModifier`, the runtime `PhysicsJoint` factory API,
+  `Sandbox.Json`, versioned save documents, and the rest of the `Sandbox.Services` surface.
+- Eight trap bullets, all live-verified, including that the host cannot slow a client-owned
+  `PlayerController` and that `NetFlags` on an RPC attribute replaces the default rather than
+  adding to it.
+
+### Changed
+- **The compile check now builds twice**, `Nullable=enable` and `Nullable=disable`, both with
+  warnings as errors. It previously tested only the strict configuration while claiming to
+  mirror a real project. A generated editor project takes its nullable setting from the
+  `.sbproj`, which defaults to off, so the loose configuration is the one most readers get and
+  the only one where `CS8632` can fire. That is how the bug above shipped.
+- **CI compiles the C#.** It previously ran two Python scripts, and the only stand-in for a
+  compile was counting braces and parentheses. A self-hosted Windows job now runs the real
+  build, gated so a fork pull request can never reach the runner.
+- **The release gate no longer green-lights an already-tagged version.** Its changelog regex
+  could not match `[Unreleased]`, so it skipped the real section and compared a released version
+  to itself. It now also cross-checks every tool name against every document that lists them,
+  caps the skill frontmatter length, and survives paths containing spaces.
+- The skill marks its claims *source*, *editor* or *unverified*. The `Model.Load` error shipped
+  because a source read was written with the confidence of a live-verified one.
+
+### Removed
+- `library/ProjectSettings/` stays, but `Tags` does not come back: `ProjectConfig` has no such
+  property, and listing branding is set on the asset.party page rather than in the manifest.
+
+## [0.3.1] - 2026-08-15
+
 Preparing the library for its first asset.party publish. **Nothing in the skill or the toolset
 changed**, so no reinstall is needed.
 

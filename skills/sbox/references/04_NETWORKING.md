@@ -163,7 +163,64 @@ the editor scene, on an object that's already spawned, or when
 the four throw; all four just return `false`, so check the return value rather than assuming
 the call succeeded.
 
-Structural changes made after `NetworkSpawn()`, adding a component, reparenting, and so on, don't propagate automatically. Push them with `Network.Refresh()`.
+### The Data Table Is Built Once, and `Network.Refresh` Rebuilds It
+
+Structural changes made after `NetworkSpawn()`, adding a component, reparenting, and so on,
+don't propagate automatically. This is not a caching quirk; it is the design.
+
+`NetworkObject.CreateDataTable()` disposes the old table, makes a new one, and calls
+`RegisterPropertiesRecursive( GameObject )` (`NetworkObject.DataTable.cs:21-27`). That walk
+enumerates `go.Components.GetAll()` **at that instant** (`:37-43`) and registers one table entry
+per `[Sync]` property it finds. It runs at spawn and nowhere else on its own.
+
+> **A component added after the object was spawned has no table entries and never replicates.**
+> Its `[Sync]` properties compile, assign, and read back locally. Nothing warns you.
+
+The cure is `Network.Refresh`, which re-runs registration and then sends a refresh snapshot.
+Three overloads, all in `GameObject.Network.cs:733-789`:
+
+```csharp
+go.Network.Refresh();                  // whole object: re-register, re-serialize, resend
+go.Network.Refresh( descendantGo );    // one GameObject in the hierarchy
+go.Network.Refresh( component );       // one Component
+```
+
+All three carry the same two limits, and both fail quietly-ish:
+
+- `if ( !Active || (IsProxy && !Networking.IsHost) ) return;`, a proxy that is not the host
+  cannot refresh at all, silently.
+- `if ( !connection.CanRefreshObjects )` logs `"{go} is trying to refresh - but we don't have
+  permission!"` and returns. `Connection.CanRefreshObjects` is `IsHost || Info?.CanRefreshObjects`
+  (`Connection.cs:137-140`), seeded from `ProjectSettings.Networking.ClientsCanRefreshObjects`,
+  which defaults true (`NetworkingSettings.cs:33`). Turn that setting off and client refreshes
+  stop working.
+
+**The same call is needed for a plain `Component.Enabled` write.** The delta snapshot carries
+exactly five fixed slots: position, rotation, scale, interpolation and `GameObject.Enabled`. A
+component's `Enabled` is not among them, and the whole block is authored only where `IsProxy`
+is false (`NetworkObject.cs:634-655`):
+
+```csharp
+if ( !IsProxy )
+{
+    ...
+    LocalSnapshotState.AddCached( _snapshotCache, SnapshotEnabledSlot, GameObject.Enabled );
+}
+```
+
+So on a **client-owned** object, the host toggling a renderer off sees it happen locally and
+nobody else does: the host is a proxy for that object, so it authors no snapshot block, and the
+component's `Enabled` was never a snapshot field in the first place. Follow the write with
+`go.Network.Refresh( theComponent )`.
+
+> **Counter-warning: do not reach for the whole-object `Refresh()` to fix a tag.** A refresh
+> from the host re-serializes the host's copy of the object over the owner's. `OnRefreshMessage`
+> only protects the receiver when the sender is *not* the host: it strips `NetworkFlags` and
+> calls `PreserveFromHostSyncMembers` inside `if ( !source.IsHost )`
+> (`NetworkObject.cs:769-786`). From the host, nothing is preserved, so a host `Refresh()` on a
+> client-owned `PlayerController` stomps the owner's own state back to the host's stale copy.
+> Derive the tag from replicated state instead: a `[Sync]` value plus an `OnUpdate` that applies
+> `Tags.Set( "x", value )` locally on every machine.
 
 ### Tearing an Object Down
 
@@ -210,6 +267,28 @@ The set covers unmanaged value types (`int`, `bool`, `float`, `Vector3`, `Rotati
 > owns the object can't write to a `FromHost` property. Confirmed live on two separate
 > occasions (ledger FN-1). A client that needs host state changed should send an
 > `[Rpc.Host]` call and let the host validate and apply it.
+
+**One level above the per-property gate, the receiver drops the entire message.** Before any
+table entry is consulted, `SceneNetworkSystem.OnNetworkTableChanges` checks the sender against
+the object's owner (`SceneNetworkSystem.cs:1216-1219`):
+
+```csharp
+// Can we receive network table changes from this source?
+if ( !source.IsHost && source.Id != obj._net.Owner )
+    return;
+```
+
+Two things follow, and both are easy to get backwards:
+
+- **The whole `ObjectNetworkTableMsg` is discarded, not the offending field.** A client that
+  smuggles one bad property into an otherwise legitimate update loses the update, not just the
+  property. If a batch of `[Sync]` writes "sometimes doesn't arrive", suspect this and not the
+  individual property.
+- **The authority here is ownership, not `SyncFlags`.** A plain `[Sync]` on an object nobody
+  owns is already safe against client writes, because an unowned object's `HasControl` is
+  `c.IsHost` (`NetworkObject.cs:893-901`) and the message-level check rejects any non-host
+  sender outright. `SyncFlags.FromHost` is what you need on an object a **client** owns and the
+  host must still control; it buys you nothing on a host-owned or unowned one.
 
 ### Reacting to Changes
 
@@ -294,6 +373,71 @@ this exact shape replicated cleanly to a second client, Guids matched, resource 
 resolved correctly, and a reference deliberately left null stayed null on the other end.
 Class-type reference fields need a public parameterless constructor and public settable
 properties to work at all; a cycle among them throws.
+
+**5. Mutating a copy of a struct element changes nothing.** `list[i]` returns a copy, so
+`list[i].Count = 3` does not compile and `var e = list[i]; e.Count = 3;` compiles and does
+nothing. Assign back through the indexer, which is a real `Replace` on the underlying
+`ObservableCollection<T>` and does replicate:
+
+```csharp
+var e = Items[i];
+e.Count = 3;
+Items[i] = e;      // this is the edit
+```
+
+**6. `NetDictionary<string, V>` is case-sensitive.** It wraps an `ObservableDictionary<K,V>`
+(`NetDictionary.cs:56`) whose backing store is `new Dictionary<TKey, TValue>()` with the default
+comparer (`ObservableDictionary.cs:30`). `"Rifle"` and `"rifle"` are two keys. Normalize before
+you insert or look up, and do it in one helper so both sides agree.
+
+### A `[Sync] string` Snapshot Versus a `NetList`
+
+`NetList` and `NetDictionary` are the right tool for a **hot collection mutated element-wise**:
+a projectile pool, a per-tick score table, anything where a single `Add` per frame is the
+traffic and sending the whole collection each time would hurt.
+
+They are the wrong tool, and the more common case in a real gamemode, for a collection that is
+**read whole and rebuilt when it changes**: a roster, a shop catalog, a scoreboard, a queue, a
+party list. For those, sync one versioned string:
+
+```csharp
+[Sync( SyncFlags.FromHost )] public string RosterJson { get; set; } = "";
+
+public sealed class RosterDoc
+{
+    public const int CurrentVersion = 2;
+    public int Version { get; set; } = CurrentVersion;
+    public List<RosterRow> Rows { get; set; } = new();
+}
+
+// Host, on any change:
+RosterJson = Json.Serialize( doc );
+
+// Everyone, on read:
+var doc = RosterDoc.Decode( RosterJson );   // null for blank / malformed / unknown
+```
+
+Why this wins for the read-whole case:
+
+- **It versions.** The envelope carries its own `Version`, so a row gained or a field renamed is
+  a migration step, not a wire break. `07_SERVICES.md` → *Versioned Save Documents* is the same
+  `Encode`/`Decode` pair, so the save file and the replicated copy stay one format.
+- **It survives a rolling update.** A client on the previous build decodes a newer document by
+  clamping it down and reading the fields it knows. A `NetList<T>` whose `T` gained a field
+  fails at the element serializer, and the failure is per-element and hard to see.
+- **It has no per-element replication semantics to get wrong.** All six rules above stop
+  applying: nothing to initialize once, no `Parent`, no `OnChanged` wiring, no proxy gate per
+  method, no struct-copy trap, no case-sensitivity surprise. It is one property with one owner.
+- **`[Change]` works on it**, because the whole property really is reassigned. That is the
+  natural "rebuild my UI" hook, and it is exactly the hook `[Change]` does *not* give you on a
+  `NetList`.
+
+The cost is that every change resends the whole document. That is the trade you are making
+deliberately: it is fine for a 40-player roster that changes on join and leave, and wrong for a
+list that changes every tick.
+
+Rule of thumb: **if the reader always wants the whole thing, sync the whole thing.** Reserve
+`NetList` for collections whose mutations outnumber their full reads.
 
 ***
 

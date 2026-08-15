@@ -1,0 +1,51 @@
+name: Feature request
+description: A new tool, or a change to how the skill or toolset works.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the engine has a subsystem the skill does not teach yet, use **Coverage gap**
+        instead. This form is for tools and for how the thing works.
+  - type: dropdown
+    id: half
+    attributes:
+      label: Which half
+      options:
+        - A new MCP tool
+        - A change to an existing tool
+        - How the skill is structured or routed
+        - Packaging, install or docs
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What went wrong without it
+      description: >
+        What were you doing, and what did it cost you? A tool earns its place by
+        closing a failure that is otherwise silent, or by answering a question you
+        had to answer some slower way. Concrete beats abstract.
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: What it would do
+      description: If you have a signature or a return shape in mind, write it.
+  - type: textarea
+    id: api
+    attributes:
+      label: What it would call
+      description: >
+        Optional, and the most useful thing you can add. The engine member, and whether
+        it is public or needs reflection out of an Editor/ assembly. A path into
+        sbox-public is ideal.
+  - type: checkboxes
+    id: dupe
+    attributes:
+      label: Before you file
+      options:
+        - label: The editor's own toolsets do not already do this (asset, scene, play, package, component, log, editor)
+        - label: I ran search_tools and nothing in sbox_mcp_server covers it

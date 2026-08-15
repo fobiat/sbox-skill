@@ -33,16 +33,26 @@ Pick whichever matches your agent.
 **If your tool auto-loads skills from a directory**, `SKILL.md` already has the frontmatter, so
 it triggers by itself:
 
+```powershell
+New-Item -ItemType Directory -Force your-game\.claude\skills | Out-Null
+Copy-Item -Recurse sbox-skill\skills\sbox your-game\.claude\skills\
+```
+
+<details><summary>bash</summary>
+
 ```bash
+mkdir -p your-game/.claude/skills
 cp -r sbox-skill/skills/sbox your-game/.claude/skills/
 ```
+
+</details>
 
 **Otherwise**, copy it somewhere your agent can read and add three lines to your project
 instructions file:
 
-```bash
-mkdir -p your-game/docs
-cp -r sbox-skill/skills/sbox your-game/docs/sbox-skill
+```powershell
+New-Item -ItemType Directory -Force your-game\docs | Out-Null
+Copy-Item -Recurse sbox-skill\skills\sbox your-game\docs\sbox-skill
 ```
 
 ```markdown
@@ -56,20 +66,59 @@ file it routes you to. Do not write an API that is not in those files.
 
 ## 3. Install the toolset
 
+```powershell
+New-Item -ItemType Directory -Force your-game\Editor | Out-Null
+Copy-Item sbox-skill\editor-mcp\SboxMcpServer.cs your-game\Editor\
+```
+
+<details><summary>bash</summary>
+
 ```bash
 mkdir -p your-game/Editor
 cp sbox-skill/editor-mcp/SboxMcpServer.cs your-game/Editor/
 ```
 
+</details>
+
 `Editor/` is a separately compiled assembly, not an `#if EDITOR` block in your game code. That
 is what lets it reach engine internals.
 
-Restart the editor. Your agent should now see `sbox_mcp_server` in `list_toolsets`, with eleven
-tools.
+Restart the editor.
 
 <br>
 
-## 4. Confirm both took
+## 4. Point your agent at the editor
+
+The toolset registers into the MCP server that ships **inside the s&box editor**. Nothing here
+starts a server; the editor already has one, and your agent has to be told where it is.
+
+It listens on `http://127.0.0.1:7269/mcp`, loopback only. For Claude Code:
+
+```bash
+claude mcp add --transport http sbox http://127.0.0.1:7269/mcp
+```
+
+For anything that reads a JSON config, the same thing:
+
+```json
+{ "mcpServers": { "sbox": { "type": "http", "url": "http://127.0.0.1:7269/mcp" } } }
+```
+
+The editor must be running for any of this to answer, and it acts on **whatever project the
+editor currently has open**, never on your shell's working directory.
+
+The port is `McpServerPort` in the editor's preferences, and `McpServerEnabled` turns the
+server off entirely. If you have changed either, use your value rather than 7269.
+
+> **The toolset will not appear in your client's tool list, and that is expected.** Listing is
+> gated on an attribute that is internal to the engine, so only the editor's own seven top-level
+> tools are listed. Everything else, including all of `sbox_mcp_server`, is reached through
+> `search_tools`, `describe_toolset` and `call_tool`. Run `search_tools` with `project_` and you
+> should see the toolset's tools come back.
+
+<br>
+
+## 5. Confirm both took
 
 **The skill.** Ask for something that should trip a Unity reflex:
 
@@ -89,7 +138,7 @@ and that `Editor/` compiled.
 
 <br>
 
-## 5. Use them together
+## 6. Use them together
 
 This is the part worth reading. Each half covers the other's blind spot.
 
@@ -130,7 +179,7 @@ the live answer wins over the document by construction.
 
 <br>
 
-## 6. Worked example
+## 7. Worked example
 
 A realistic exchange once both are installed.
 

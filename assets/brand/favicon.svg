@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="32" height="32" role="img" aria-label="s&amp;box MCP Server">
+  <title>s&amp;box MCP Server</title>
+  <rect width="64" height="64" rx="10.7" fill="#202020"/>
+  <line x1="32" y1="30" x2="32" y2="22" stroke="#00A8E8" stroke-width="5" stroke-linecap="round"/>
+  <path d="M32 10 L40 23 L24 23 Z" fill="#00A8E8"/>
+  <circle cx="32" cy="44" r="6" fill="#2BB88E"/>
+</svg>

@@ -190,20 +190,46 @@ IEnumerable<GameObject> FindInPhysics( Frustum f )
 
 ## GameTransform
 
+Most of this type's obvious-looking members are obsolete. `GameTransform` is the whole
+transform machine, but the properties you reach for live on `GameObject` and `Component`
+instead. Go through the `Transform` property only when you want a whole `Transform` struct,
+the interpolation controls, or the proxy.
+
 ```
-// Properties
-Vector3 Position, Rotation Rotation, Vector3 Scale           // world
-Vector3 LocalPosition, Rotation LocalRotation, Vector3 LocalScale
-Transform Local, Transform World, Transform InterpolatedLocal
+// Current
+Transform Local                 // read/write, local space
+Transform World                 // read/write, world space
+Transform InterpolatedLocal     // read-only
 GameObject GameObject
 TransformProxy Proxy
+Action OnTransformChanged       // public field, not an event; += to subscribe
 
-// Methods
-void LerpTo( Transform target, float frac )
+void LerpTo( in Transform target, float frac )
 void ClearInterpolation()
-void ClearLerp()
 IDisposable DisableProxy()
 ```
+
+**Seven members of this type are `[Obsolete]` and are build failures under
+`TreatWarningsAsErrors`**, which is exactly the configuration a released package ships with.
+All seven still compile-and-run in a warnings-tolerant project, which is why they keep
+turning up in copied sample code:
+
+| Trap, `Transform.X` | Write instead | Obsolete at |
+|:--|:--|:--|
+| `Position` | `WorldPosition` | `GameTransform.cs:267` |
+| `Rotation` | `WorldRotation` | `GameTransform.cs:284` |
+| `Scale` | `WorldScale` | `GameTransform.cs:300` |
+| `LocalPosition` | `LocalPosition` on the object | `GameTransform.cs:312` |
+| `LocalRotation` | `LocalRotation` on the object | `GameTransform.cs:327` |
+| `LocalScale` | `LocalScale` on the object | `GameTransform.cs:344` |
+| `ClearLerp()` | `ClearInterpolation()` | `GameTransform.Interpolation.cs:191` |
+
+The replacements are the plain `World*` / `Local*` properties, which exist on both
+`GameObject` (`GameObject.WorldTransform.cs:10-48`, `GameObject.LocalTransform.cs:10-40`)
+and `Component` (`Component.WorldTransform.cs:10-40`, `Component.LocalTransform.cs:10-40`).
+Inside a component you write `WorldPosition`, not `Transform.Position`. The three `Local*`
+rows are the nastiest: `Transform.LocalPosition` and a bare `LocalPosition` read identically
+and differ only in whether the build passes.
 
 ---
 
@@ -460,13 +486,20 @@ static bool UsingController
 static int ControllerCount
 static bool Suppressed
 static float GetAnalog( InputAnalog analog )
-static IDisposable PlayerScope( int index )
+static IDisposable PlayerScope( Input.PlayerIndex player )
 static Texture GetGlyph( string name, InputGlyphSize size = 0, bool outline = false )
 static string GetButtonOrigin( string name, bool ignoreController = false )
 static void TriggerHaptics( float leftMotor, float rightMotor, float leftTrigger = 0, float rightTrigger = 0, int duration = 500 )
 static void TriggerHaptics( HapticEffect pattern, float lengthScale = 1, float frequencyScale = 1, float amplitudeScale = 1 )
 static void StopAllHaptics()
 ```
+
+`PlayerIndex` is nested on `Input` and takes named slots, not raw numbers
+(`Systems/Input/PlayerIndex.cs:10-36`): `KeyboardAndMouse = 0`, `Controller1 = 1` through
+`Controller4 = 4`. The old `PlayerScope( int )` overload still exists but is `[Obsolete]`
+and `[EditorBrowsable(Never)]` (`Systems/Input/Input.Scoping.cs:45-47`), so it never shows
+in completion and fails the build under `TreatWarningsAsErrors`. Write
+`using ( Input.PlayerScope( Input.PlayerIndex.Controller2 ) )`.
 
 ---
 
@@ -527,7 +560,7 @@ static Model Load( string filename )          // main thread only; see notes bel
 static Task<Model> LoadAsync( string filename )
 static Model Cube, Sphere, Plane, Error
 BBox Bounds, PhysicsBounds, RenderBounds
-bool IsValid, string Name
+bool IsValid, bool IsError, string Name
 int BoneCount, AnimationCount, MorphCount, MeshCount
 BoneCollection Bones
 HitboxSet HitboxSet
@@ -539,28 +572,70 @@ string GetBoneName( int boneIndex )
 Transform GetBoneTransform( int boneIndex )
 ```
 
-**Always null-check what `Model.Load` gives back.** It fails two separate ways depending
-on what you handed it (`Resources/Model/Model.Load.cs:12-28`):
+### A failed `Model.Load` can come back null **or** as the error model
 
-- Pass an empty, whitespace, or null path and you get `Model.Error` back, the pink
-  checkerboard placeholder (`models/dev/error.vmdl`, `Model.Static.cs:58`).
-- Pass a path that just doesn't exist and native lookup hands you back **null**
-  (`Model.Static.cs:12-15`, an invalid native handle resolves to null).
+*Live-verified: this shape shipped five separate fix commits in one gamemode on 2026-08-10,
+all of them deleting a dead `model is null` branch that could never fire.*
 
-A blank path fails loud with a visible model. A typo'd path fails quiet, a few frames
-later, as a null reference somewhere downstream.
+`Model.Load` has two failure paths and you cannot tell from the call site which one you
+just took:
+
+- Null, empty, or whitespace returns `Model.Error` immediately (`Model.Load.cs:16-17`),
+  which is itself `Load( "models/dev/error.vmdl" )` (`Model.Static.cs:58`).
+- Anything else falls through to
+  `FromNative( NativeGlue.Resources.GetModel( filename ), name: filename )`
+  (`Model.Load.cs:27`). `FromNative` returns null only when the native handle is null or
+  not strongly valid (`Model.Static.cs:14-15`). A path that simply resolves to nothing
+  usually comes back as a **valid handle flagged as the error model**, which is a non-null
+  `Model`.
+
+`Model.IsError` is what distinguishes them, and it has three terms, not two:
+
+```csharp
+public override bool IsError => native.IsNull || !native.IsStrongHandleValid() || native.IsError();
+//                              Model.cs:105       ^ third term is the error model
+```
+
+So the only correct check tests both:
 
 ```csharp
 var model = Model.Load( path );
-if ( model is null )
+if ( model is null || model.IsError )
 {
     Log.Warning( $"Missing model: {path}" );
-    model = Model.Error;      // fail visibly, not with a NullReferenceException
+    model = Model.Error;      // fail visibly and deliberately
 }
 ```
 
-Calling it off the main thread asserts. Reach for `Model.LoadAsync` instead when you're
-not on the hot path.
+**A null-coalesce cannot express this.** `authored ?? Model.Load( fallback )` reads as a
+fallback and is not one: when `authored` is the error model it is non-null, `??` passes it
+straight through, and the fallback never runs. That is how a composed door ships orange.
+
+Calling it off the main thread asserts (`Model.Load.cs:14`). Reach for `Model.LoadAsync`
+when you are not on the hot path; it returns `Error` for a blank path too
+(`Model.Load.cs:39-40`).
+
+### Which resource types actually have an `IsError` worth checking
+
+`Resource.IsError` is `virtual` and returns `false` (`Resources/Resource.cs:41`). Only four
+types override it, and only two of those test anything real:
+
+| Type | `IsError` | Worth checking? |
+|:--|:--|:--|
+| `Model` | `IsNull \|\| !IsStrongHandleValid() \|\| native.IsError()` (`Model.cs:105`) | Yes |
+| `Texture` | same three terms (`Textures/Texture.cs:31`) | Yes |
+| `AnimationGraph` | `IsNull \|\| !IsStrongHandleValid()` (`AnimationGraph.cs:26`) | Validity only, no error-asset term |
+| `ParticleSystem` | `=> default` (`ParticleSystem.cs:14`) | No, hardcoded false |
+| `Material`, `SoundFile`, `Shader`, everything else | inherited `false` | No |
+
+Demanding an `IsError` check on a `Material` or a `SoundFile` is demanding a check that
+is hardcoded to `false`. Null-check those instead.
+
+`Texture.Load` has the same error-asset behaviour with the blank-path case inverted. A
+blank path returns **null** (`Texture.Load.cs:60`), and a bad path falls through to
+`NativeGlue.Resources.GetTexture( filepath )`, which the engine's own comment describes as
+worst case giving an error texture (`Texture.Load.cs:206-212`). So `if ( t is null ||
+t.IsError )` is right for textures too; only the blank-path branch differs from `Model`.
 
 ---
 

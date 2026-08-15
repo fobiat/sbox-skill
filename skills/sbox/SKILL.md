@@ -27,7 +27,7 @@ That surface similarity is the whole problem. Unity muscle memory produces code 
 
 **Open the relevant reference file before you write a single line.** This file is a router. It tells you where the answer is; it does not contain the answer. Writing a component? Open `references/01_SCENE.md`. Writing UI? Open `references/03_UI.md`. There is no exception for a task that feels simple, because the tasks that feel simple are the ones muscle memory ruins.
 
-The API schema is ground truth. Where this file and the schema disagree, the schema wins.
+The API schema is ground truth for what exists. Where this file and the schema disagree, the schema wins. It is not ground truth for what happens: see the three-state evidence note under *Traps worth knowing up front*, and treat a signature as proof of existence only.
 
 ---
 
@@ -107,6 +107,8 @@ Match the task, open the file. Do not guess, open the file.
 | Detect VR, read the rig, controllers or haptics | `references/12_VR_VOICE.md` |
 | Capture, transmit or play voice chat, show a speaking indicator | `references/12_VR_VOICE.md`, *Voice* |
 | Edit `Input.config` or `Platform.config`, kill the platform chat | `references/05_INPUT_PHYSICS.md`, *Project Settings Configs* |
+| Declare a `[ConCmd]` or `[ConVar]`, read the injected `caller` | `references/17_CONSOLE.md` |
+| Run a command from code, or probe a live session from the console | `references/17_CONSOLE.md`, *Running Commands From Code* |
 | Drive the editor over MCP (assets, scene, compile, play mode) | `references/14_VERIFICATION.md`, *Editor MCP Server* |
 | Find out what has actually been proven in a live session | `references/14_VERIFICATION.md`, *Verified Behaviour* |
 | Get the full signature of `GameObject`, `Component`, `Scene`, `Input` | `references/15_API_CORE.md` |
@@ -133,14 +135,14 @@ Any time you write the left column, you are inventing an API. Use the right.
 | `transform.position` | `WorldPosition` |
 | `transform.localPosition` | `LocalPosition` |
 | `transform.rotation` | `WorldRotation` |
-| `transform.forward` | `WorldRotation.Forward` |
+| `transform.forward` | `WorldRotation.Forward`, but not on a player root: see the traps below |
 | `gameObject.SetActive(false)` | `GameObject.Enabled = false` |
 | `Destroy(gameObject)` | `GameObject.Destroy()` / `Component.Destroy()` / `DestroyGameObject()` |
 | `Instantiate(prefab, pos, rot)` | `prefab.Clone( pos, rot )` |
 | `Instantiate(prefab); NetworkServer.Spawn(...)` | `prefab.Clone(pos).NetworkSpawn( owner )` |
 | `GetComponent<T>()` in `Start`/`Update` | `GetComponent<T>()` works; use `Components.Get<T>( FindMode )` for ancestor or descendant searches |
 | `FindObjectOfType<T>()` | `Scene.Get<T>()` / `Scene.GetAll<T>()` / `Scene.GetAllComponents<T>()` |
-| `GameObject.Find("Name")` | `Scene.Directory.FindByName("Name")` |
+| `GameObject.Find("Name")` | `Scene.Directory.FindByName("Name")` returns `IEnumerable<GameObject>`, every match. Add `.FirstOrDefault()` if you want one |
 | `OnCollisionEnter(Collision c)` | `Component.ICollisionListener.OnCollisionStart(Collision c)` |
 | `OnTriggerEnter(Collider c)` | `Component.ITriggerListener.OnTriggerEnter(Collider c)` |
 | `Physics.Raycast(...)` | `Scene.Trace.Ray( from, to ).Run()`, returns `SceneTraceResult` |
@@ -155,8 +157,8 @@ Any time you write the left column, you are inventing an API. Use the right.
 | `Camera.main` | `Scene.Camera` |
 | `Camera.main.ScreenPointToRay(...)` | `Scene.Camera.ScreenPixelToRay( Mouse.Position )` |
 | `StartCoroutine(Foo())` | `async Task Foo()`, called as `_ = Foo();` |
-| `yield return new WaitForSeconds(1f)` | `await Task.DelaySeconds( 1f )` |
-| `yield return null` | `await Task.Frame()` |
+| `yield return new WaitForSeconds(1f)` | `await Task.DelaySeconds( 1f )` **inside a `Component`**, else `await GameTask.DelaySeconds( 1f )` |
+| `yield return null` | `await Task.Frame()` **inside a `Component`**, else `await GameTask.Yield()`. There is no `GameTask.Frame()` |
 | `Debug.Log(x)` | `Log.Info(x)` / `Log.Warning(x)` / `Log.Error(x)` |
 | `Time.time` | `Time.Now` |
 | `Time.deltaTime` | `Time.Delta` |
@@ -188,7 +190,7 @@ If a Unity pattern is not in this table, assume it does not exist and look it up
 5. **Guard networked logic with `if ( IsProxy ) return;`.** Any component that reads input or drives movement opens with this line. Without it every client tries to move every player.
 6. **Traces go through `Scene.Trace`.** It is a builder: `Scene.Trace.Ray(from, to).UseHitboxes(true).WithoutTags("player").Run()`. Never `Physics.Raycast`.
 7. **Game UI is Razor and flexbox.** `display: flex` is the default and effectively the only layout; `display: block` does not exist. `:intro` and `:outro` animate creation and deletion. Root panels override `BuildHash()` to control re-render. Editor UI is a different system entirely.
-8. **There are no coroutines.** Use `async Task` with `await Task.DelaySeconds( n )` and `await Task.Frame()`. Fire and forget with `_ = MyTask();`. The `Component.Task` property scopes cancellation to the GameObject's lifetime.
+8. **There are no coroutines, and `Task.Frame()` only exists inside a `Component`.** `Component` declares `protected TaskSource Task` (`Component.cs:53`), which shadows the `System.Threading.Tasks.Task` type, so `await Task.Frame()`, `Task.FrameEnd()`, `Task.FixedUpdate()` and `Task.DelaySeconds( n )` resolve there and nowhere else. `Panel` has its own (`Panel.cs:47`). In a `GameObjectSystem`, a static helper or an `EditorTool` there is no such property, `Task` means the BCL type, and those calls do not compile. The static facade is `Sandbox.GameTask`, which has `Yield()`, `Delay`, `DelaySeconds`, `MainThread()`, `WorkerThread()` and **no `Frame()`**. Fire and forget with `_ = MyTask();`. `Component.Task` also scopes cancellation to the GameObject's lifetime, which `GameTask` does not.
 9. **Never touch blocked .NET APIs.** `System.IO.File`, `Console`, `Thread`, raw sockets and `HttpClient` are rejected by the sandbox compiler, not at runtime. Use `FileSystem.Data`, `Log`, `async/await` and `Http`.
 10. **Look up every API before you use it.** If you cannot find a method in `15_API_CORE.md` or `16_API_INDEX.md`, either you are guessing, or it is nested on a specific type. Stop and check.
 
@@ -273,6 +275,16 @@ Complete runnable examples, including an FPS controller, a networked player, a R
 
 Each of these is documented properly in a reference file. They are here because they cost real time and a model will not suspect any of them.
 
+Every claim in this skill sits in one of three states, and they are not interchangeable:
+
+- **source**: read out of `sbox-public` or the shipped assemblies. Proves the API exists and what it says. Does not prove what it does at runtime.
+- **editor**: watched happen in a live editor or play session, with a date. This is the only state that proves behaviour.
+- **unverified**: inferred, remembered, or read somewhere else. Say so out loud rather than presenting it flat.
+
+An unmarked claim is *source*. Anything stronger says so inline, like the `(editor)` tags below.
+
+The `Model.Load` entry is the reason this vocabulary exists. It shipped with a correct source citation and was still wrong, because a source read was written up with the confidence of a live-verified one. `references/14_VERIFICATION.md` is the register of what has actually been observed.
+
 - `ICollisionListener` names its parameter `collision`, not `other`. The published docs are wrong about this.
 - `Color`, `Capsule`, `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox` and `Ray` are global types, not `Sandbox.*`.
 - `LobbyConfig` and `LobbyPrivacy` need `using Sandbox.Network;`.
@@ -284,7 +296,7 @@ Each of these is documented properly in a reference file. They are here because 
 - `PlayerController.TraceBody` takes four parameters. The fourth is `heightScale`.
 - Operators such as `Rotation * Rotation` are missing from the schema because the extraction excludes them systematically. They exist, use them.
 - **`[GameResource(...)]` is obsolete engine-wide.** Custom data assets use `[AssetType( Name = ..., Extension = ..., Category = ... )]` with property initializers, not constructor arguments. Under `TreatWarningsAsErrors` the old attribute is a build failure.
-- **`Model.Load( "typo/path.vmdl" )` returns `null`**, not `Model.Error`. Only a null or empty path gives the error placeholder. Null-check every load.
+- **`Model.Load` on a bad path can return `null` *or* the error model, and you cannot tell which at the call site.** *(editor, 2026-08-10.)* Test both: `if ( model is null || model.IsError )`. `Model.IsError` has three terms and the third is the error asset (`Model.cs:105`), which is a perfectly valid non-null `Model`. That also means `authored ?? Model.Load( fallback )` is not a fallback: an error model is non-null, `??` passes it straight through, and the object ships orange. `Texture.Load` behaves the same way except a blank path gives `null` there rather than the placeholder.
 - **`GameObject.NetworkSpawn()` with no arguments assigns ownership to `Connection.Local`**, whoever called it. For a host-authoritative world object that is a quiet wrong-owner bug. Always pass an explicit owner.
 - **`NetworkMode.Snapshot` is the default for scene objects and does not live-replicate `[Sync]`**, while RPCs keep working perfectly. Stale-state bugs here look like nothing is wrong.
 - **`NetList<T>.OnChanged` is a public `Action<NetListChangeEvent<T>>` field, not `[Change]`.** `[Change]` wraps the property setter, so on a collection it only fires when you reassign the whole thing.
@@ -292,7 +304,15 @@ Each of these is documented properly in a reference file. They are here because 
 - **`Prop` is breakable, flammable and gibbable.** For a non-destructible object, compose `ModelRenderer` + `ModelCollider` + `Rigidbody` yourself. Its `Break()` method is an editor button that decomposes the component; it does not break the prop.
 - **`Sandbox.Platform.Chat` is a global pipe that exists whether your gamemode uses it or not.** `ChatShowUI: false` only hides the overlay and `Say()` still broadcasts. Disable it with `"ChatEnabled": false` in `ProjectSettings/Platform.config`.
 - **`Mixer.Spacializing` is an obsolete alias for `Mixer.Spatializing`.** Both spellings exist, the misspelled one forwards to the correct one, and deserialization accepts either key.
-- `PlayerController.IEvents.PostCameraSetup` is obsolete. Implement `ICameraModifier` instead.
+- `PlayerController.IEvents.PostCameraSetup` is obsolete. Implement `ICameraModifier` instead, see `references/02_COMPONENTS.md`, *Camera*.
+- **`PlayerController` is `sealed`, so a `MoveMode` component is the supported way to change how it moves.** Trying to subclass the controller fails at the class declaration. See `references/02_COMPONENTS.md`, *MoveMode*.
+- **The host cannot slow down a client-owned `PlayerController`.** *(editor.)* `WalkSpeed`, `RunSpeed`, `DuckedSpeed` and `JumpSpeed` are `[Property]`, not `[Sync]`, and `OnFixedUpdate` returns on `IsProxy` before it reaches `InputMove()`. The host writes the number, believes the player is restrained, and the player walks away. Restraint has to be a synced value the owning client applies to itself.
+- **A nullable *reference* annotation in a `.razor` `@code` block is CS8669 and fails the editor compile.** *(editor.)* Addon code builds with `NullableContextOptions.Disable` unless the `.sbproj` turns `Compiler.Nullables` on (`CompilerConfiguration.cs:30`, `Compiler.Build.cs:181`), and the razor generator emits no `#nullable` directive into the file it writes (`Razor.cs:11-28`), so there is nothing to opt in to the way a hand-written `.cs` can. A headless `dotnet build` sees none of this: it sets its own `<Nullable>`, and it never runs the razor generator. `string?` fails, `float?` is fine; return a sentinel or move the member to a `.cs` partial.
+- **A `static readonly` field keeps its old value across a hotload instead of re-running its initialiser.** *(editor.)* Hotload cannot assign an init-only field, so it upgrades the old instance onto the new one in place (`Hotload/UpdateReferences.cs:458-469`). A new entry added to a static catalog of lambdas or method groups is invisible for the rest of the session, with no error. Restart the editor, or make the field mutable.
+- **Naming any `NetFlags` on an RPC attribute *replaces* the default rather than adding to it.** The attribute's default is `NetFlags.Reliable` (`Rpc.Attributes.cs:12`), so `[Rpc.Broadcast( NetFlags.HostOnly )]` sends unreliably and out of order. Write `HostOnly | Reliable` explicitly whenever you name a flag.
+- **`OnEnabled` runs after every `OnAwake` in the same deferred batch.** Both are queued into a `CallbackBatch` and executed in enum order, `Awake` before `Enable` (`CallbackBatch.cs:189-194`, `CommonCallback` at `:241-246`). A singleton that latches itself in `OnEnabled` is invisible to another component's `OnAwake` on the same frame, and a `?? new(...)` fallback will quietly construct a second instance. Latch in `OnAwake`.
+- **A player root's `WorldRotation` is not its facing.** `PlayerController.OnEnabled` reads the spawn yaw into `EyeAngles`, then pins `WorldRotation = Rotation.Identity` (`PlayerController.cs:153-156`), and nothing on the walk, swim or ladder path writes it again; only `SitMoveMode` does. So the root sits at a constant world +X and `WorldRotation.Forward` off it gives the same vector for every player forever. Body yaw lives on the `Renderer` child, driven by `MoveMode.OnRotateRenderBody`; aim direction is `EyeAngles` or `EyeTransform`.
+- **The engine's compile is not a headless `dotnet build`.** It runs an access-control pass over the emitted IL that no external build does (`Compiler.Build.cs:233-271`), and it applies the `.sbproj` compiler settings, including `TreatWarningsAsErrors`. `caller?.SteamId ?? 0` is the canonical case: `0` is an `int`, so `??` binds `SteamId`'s `[Obsolete] implicit operator SteamId( int )` (`SteamId.cs:47-48`), which is a warning by default and a build failure the moment warnings are errors. Write `?? 0L`.
 
 ---
 
@@ -303,7 +323,7 @@ Each of these is documented properly in a reference file. They are here because 
 3. **Then `16_API_INDEX.md`**, a namespace-organised index of the wider surface. Find the type, then get its full signature elsewhere.
 4. **If it is in none of them, it does not exist.** Do not write it. There is almost always an idiomatic way to do what you wanted.
 
-A schema entry proves an API exists. It does not prove it behaves the way you assume, and nearly every trap above is a case where a correct-looking call silently does nothing. `references/14_VERIFICATION.md` records which behaviours were observed in a live editor session, with dates, as opposed to merely read out of source. Check it before concluding that the API says something should work.
+A schema entry proves an API exists. It does not prove it behaves the way you assume, and nearly every trap above is a case where a correct-looking call silently does nothing. That is the *source* versus *editor* split from the evidence note above: `references/14_VERIFICATION.md` records what was observed in a live session, with dates. Check it before concluding that the API says something should work, and when you report a finding of your own, say which of the three states it came from.
 
 ---
 

@@ -1,0 +1,16 @@
+# Every text file is stored LF in the repository and checked out in the
+# platform's own convention, CRLF on Windows. Without this the result depends on
+# whoever cloned it: with core.autocrlf unset a Windows clone gets LF, and the
+# next tool that rewrites a file with os.linesep turns it into a whole-file CRLF
+# diff. scripts/stamp_headers.py was that tool.
+* text=auto
+
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.zip  binary
+*.dll  binary
+*.vpk  binary

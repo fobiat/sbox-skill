@@ -262,16 +262,73 @@ Useful methods:
 
 ### Joint Types
 
-All joint types derive from the abstract `Joint` class and link two physics bodies together.
+All joint components derive from the abstract `Joint` (`Scene/Components/Joint/Joint.cs:6`,
+`Component, ExecuteInEditor`) and link two physics bodies. `Joint` itself carries
+`Body` (the `GameObject` to attach to), `AnchorBody` (null means this GameObject),
+`EnableCollision`, `Attachment`, `LocalFrame1`, `LocalFrame2`, `StartBroken`,
+`BreakForce`, `BreakTorque`, `OnBreak` (an `Action` `[Property]`, not an event),
+the settable `Point1` / `Point2`, the read-only `LinearStress` / `AngularStress` /
+`IsBroken` / `Body1` / `Body2` / `Object1` / `Object2`, and `Break()` / `Unbreak()`.
 
-| Joint Type | What It Constrains |
-|:--|:--|
-| `FixedJoint` (sealed) | Welds two objects together rigidly |
-| `HingeJoint` (sealed) | Rotation around a single axis, for doors and wheels. Properties: `MinAngle`, `MaxAngle`, `Friction`. |
-| `BallJoint` (sealed) | Free rotation, like a shoulder. Properties: `SwingLimit`, `TwistLimit`. |
-| `SliderJoint` (sealed) | Translation along a single axis, for drawers. |
-| `SpringJoint` (sealed) | A spring connection with configurable spring and damping values. |
-| `WheelJoint` (sealed) | Simulates a vehicle wheel. |
+| Joint Type | What It Constrains | Its own properties |
+|:--|:--|:--|
+| `FixedJoint` (sealed) | Welds two bodies rigidly | `LinearFrequency`, `LinearDamping`, `AngularFrequency`, `AngularDamping` |
+| `HingeJoint` (sealed) | Rotation about one axis, doors and wheels | `MinAngle`, `MaxAngle`, `Motor`, `Friction`, `TargetAngle`, `Frequency`, `DampingRatio`, `TargetVelocity`, `MaxTorque`, read-only `Angle` / `Speed` / `Axis` |
+| `BallJoint` (sealed) | Free rotation, like a shoulder | `Motor`, `SwingLimitEnabled`, `SwingLimit`, `TwistLimitEnabled`, `TwistLimit`, `Friction`, `TargetRotation`, `Frequency`, `DampingRatio`, `TargetVelocity`, `MaxTorque` |
+| `SliderJoint` (sealed) | Translation along one axis, drawers | `MinLength`, `MaxLength`, `Friction` |
+| `SpringJoint` (sealed) | A spring between two bodies | `Frequency`, `Damping`, `MinLength`, `MaxLength`, `RestLength`, `ForceMode` |
+| `WheelJoint` (sealed) | A vehicle wheel: suspension, spin, steering | `EnableSuspension`, `SuspensionHertz`, `SuspensionDampingRatio`, `EnableSuspensionLimit`, `SuspensionLimits`, `EnableSpinMotor`, `SpinMotorSpeed`, `MaxSpinTorque`, `EnableSteering`, `TargetSteeringAngle`, `SteeringLimits`, ... |
+| `ControlJoint` (sealed) | Drives a body toward a velocity, physgun-style holding | `LinearVelocity`, `AngularVelocity`, `MaxVelocityForce`, `MaxVelocityTorque`, `LinearSpring`, `AngularSpring` (both `PhysicsSpring`) |
+| `UprightJoint` (sealed) | Keeps a body upright | `Hertz`, `DampingRatio`, `MaxTorque` |
+
+**`BallJoint.SwingLimit` and `TwistLimit` are `Vector2`, not scalars**, holding a minimum
+and maximum angle in degrees, defaulting to `(0, 90)` and `(-15, 15)`
+(`Joint/BallJoint.cs:79` and `:123`). Both are inert until you also set
+`SwingLimitEnabled` / `TwistLimitEnabled`, which default to `false` (`:57`, `:101`).
+Setting the limit alone changes nothing and produces no warning.
+
+**`HingeJoint.Fequency` is an `[Obsolete]` misspelling sitting right beside the correct
+`Frequency`** (`Joint/HingeJoint.cs:138-139` forwards to `:146`). Same trap shape as
+`Mixer.Spacializing`: both spellings compile, the wrong one forwards to the right one,
+and it is a build failure under `TreatWarningsAsErrors`. Autocomplete will offer you both.
+
+#### Building joints at runtime: `Sandbox.Physics.PhysicsJoint`
+
+The components above are the authored, inspector-facing layer. To make a joint in code
+without adding a component, use the static factories on `Sandbox.Physics.PhysicsJoint`
+(`Systems/Physics/PhysicsJoint.cs`). These return the physics-layer joint types, which live
+in `Sandbox.Physics` and are **different types with the same names** as the components:
+`Sandbox.Physics.HingeJoint` is not `Sandbox.HingeJoint`.
+
+```
+static FixedJoint      CreateFixed( PhysicsPoint a, PhysicsPoint b )                                  // :164
+static SpringJoint     CreateLength( PhysicsPoint a, PhysicsPoint b, float maxLength )                // :182
+static SpringJoint     CreateSpring( PhysicsPoint a, PhysicsPoint b, float minLength, float maxLength ) // :203
+static HingeJoint      CreateHinge( PhysicsPoint a, PhysicsPoint b )                                  // :221
+static HingeJoint      CreateHinge( PhysicsBody body1, PhysicsBody body2, Transform localFrame1, Transform localFrame2 ) // :236
+static HingeJoint      CreateHinge( PhysicsBody body1, PhysicsBody body2, Vector3 center, Vector3 axis )  // :376
+static SliderJoint     CreateSlider( PhysicsPoint a, PhysicsPoint b, float minLength, float maxLength ) // :260
+static SliderJoint     CreateSlider( PhysicsBody body1, PhysicsBody body2, Vector3 origin1, Vector3 origin2, Vector3 axis, float minLength, float maxLength ) // :383
+static BallSocketJoint CreateBallSocket( PhysicsPoint a, PhysicsPoint b )                             // :310
+static BallSocketJoint CreateBallSocket( PhysicsBody body1, PhysicsBody body2, Vector3 origin )       // :285
+static ControlJoint    CreateControl( PhysicsPoint a, PhysicsPoint b )                                // :324
+static UprightJoint    CreateUpright( PhysicsPoint a, PhysicsPoint b )                                // :363
+static PulleyJoint     CreatePulley( PhysicsBody body1, PhysicsBody body2, Vector3 anchor1, Vector3 ground1, Vector3 anchor2, Vector3 ground2 ) // :390
+```
+
+Note there is no `CreateBall`: the physics-layer name is `BallSocketJoint`, while the
+component is `BallJoint`.
+
+`PhysicsPoint` (`Systems/Physics/PhysicsPoint.cs`) is a struct describing where on a body
+to attach: `Body`, `LocalPosition`, `LocalRotation`, plus `LocalTransform` and a world-space
+`Transform`. There is an implicit conversion from `PhysicsBody`, so passing a bare body
+attaches at its origin. Build one deliberately with `PhysicsPoint.Local( body, pos, rot )`
+or `PhysicsPoint.World( body, worldPos, worldRot )`.
+
+On the returned `PhysicsJoint`: `Remove()`, `OnBreak` (a real `event Action` here, unlike
+the component's `Action` property), `World`, `Body1` / `Body2`, `Point1` / `Point2`
+(settable), `Collisions`, `Strength` (max linear impulse before it breaks) and
+`AngularStrength` (max angular impulse).
 
 ***
 
@@ -341,6 +398,57 @@ protected override void OnUpdate()
 ```
 
 `Scene.Camera.Hud` renders before post-processing kicks in. `Scene.Camera.Overlay` sits above everything, post-processing included.
+
+### ICameraModifier and CameraView
+
+This is how you change the camera in 26.08.05. Not by writing `Scene.Camera.WorldPosition`
+from `OnUpdate` and hoping nothing else does too, and not through
+`PlayerController.IEvents.PostCameraSetup`, which is `[Obsolete]`
+(`PlayerController.Events.cs:18`).
+
+```csharp
+// Scene/Components/Camera/CameraView.cs:52-68, namespace Sandbox
+public interface ICameraModifier
+{
+    int  CameraOrder { get; }                                        // default 0
+    void ModifyCamera( CameraComponent camera, ref CameraView view );
+    void PostCameraSetup( CameraComponent camera, in CameraView view );
+}
+
+// CameraView.cs:10-31, a struct
+public struct CameraView
+{
+    public Vector3   Position;
+    public Rotation  Rotation;
+    public float     FieldOfView;   // degrees
+    public float     ZNear, ZFar;
+    public readonly Transform Transform { get; }    // Position + Rotation
+    public readonly Ray       ForwardRay { get; }   // for aim traces off the composed view
+}
+```
+
+All three interface members have default implementations, so implement only what you need.
+Implement it on any `Component`: the camera gathers every `ICameraModifier` in the scene
+with `Scene.GetAll<ICameraModifier>().OrderBy( x => x.CameraOrder )`
+(`CameraComponent.cs:290-291`), then runs the chain.
+
+Order matters and the engine's own values are the calibration: `PlayerController`
+implements it at **order 0** (`PlayerController.Camera.cs:34`), `BaseCombatWeapon` at
+**order 200** (`BaseCombatWeapon.Camera.cs:5`). Lower runs first. Put a vehicle around 100,
+an aim-down-sights modifier above the weapon.
+
+The composition runs once per camera per tick, after Update and bone merging and before
+PreRender (`CameraComponent.cs:293-316`): every `ModifyCamera` in order, then `View` is
+published, then every `PostCameraSetup` gets the final view. `PostCameraSetup` is where
+you place things **against** the camera (view models, attached props); do not modify the
+camera there, the write is already too late.
+
+`CameraComponent.View` is the composed result (`CameraComponent.cs:269`). Read
+`View.FieldOfView` for zoom-aware logic like scaling look sensitivity while scoped. It is
+final only from the camera stage onward, so reading it during `OnUpdate` gives you the
+previous frame's composition. Transient screen shake and punches bake into the render view
+only and never touch `View`, so they cannot accumulate into the player's aim
+(`CameraComponent.cs:320-330`).
 
 ***
 
@@ -562,7 +670,7 @@ Every feature listed below can be switched off individually via right-click on i
 | Feature | Relevant Properties |
 |:--|:--|
 | **Body** | `BodyRadius`, `BodyHeight`, `BodyMass`, `BodyCollisionTags` |
-| **Input** | `UseInputControls`, `WalkSpeed`, `RunSpeed`, `DuckedSpeed`, `JumpSpeed` |
+| **Input** | `UseInputControls`, `WalkSpeed`, `RunSpeed`, `DuckedSpeed`, `JumpSpeed` (see the warning below, these do not network) |
 | **Camera** | `UseCameraControls`, `ThirdPerson`, `HideBodyInFirstPerson`, `CameraOffset`, `EyeDistanceFromTop` |
 | **Look** | `UseLookControls`, `PitchClamp`, `LookSensitivity`, `RotateWithGround` |
 | **Animator** | `UseAnimatorControls`, `Renderer` (SkinnedModelRenderer) |
@@ -589,6 +697,18 @@ Useful methods:
 - `TraceBody( Vector3 from, Vector3 to, float scale = 1f, float heightScale = 1f )` → `SceneTraceResult`
 - `StartPressing( Component )` / `StopPressing()`: drives pressing manually
 
+**The host cannot slow another player down by writing these.** `WalkSpeed`, `RunSpeed`,
+`DuckedSpeed` and `JumpSpeed` are `[Property, Feature("Input")]` and **not** `[Sync]`
+(`PlayerController.Input.cs:8-11`). Exactly three members on the whole controller are
+`[Sync]`: `EyeAngles`, `IsDucking` and `WishVelocity`, and none of them is a speed.
+Worse, `OnFixedUpdate` returns on `IsProxy` before it ever calls `InputMove()`
+(`PlayerController.DefaultControls.cs:74-77`), and `InputMove` is what reads
+`Controller.WalkSpeed` through `MoveMode.UpdateMove` (`Modes/MoveMode.cs:158-161`). So a
+host that sets `victim.WalkSpeed = 20` changes a number nobody reads: the host believes
+the player is restrained, and the player walks away at full speed. Restraint has to be a
+`[Sync]`ed value that the **owning client** applies to its own controller, or a `MoveMode`
+that scores above the walk mode.
+
 **Custom input:** turn off `UseInputControls`, then set `WishVelocity` and `EyeAngles` yourself inside `OnFixedUpdate`.
 
 **Pressing, "press E to use":** implement `Component.IPressable` on whatever component should be pressable. The controller traces `ReachLength` outward from the eye with an expanding radius, then hunts for `GetComponentsInParent<IPressable>( includeSelf: true )` on whatever the trace connects with. All of it runs client-side, on the pressing player only (`OnUpdate`, wrapped in `if ( !IsProxy )`), so anything that needs to be authoritative, granting an item, opening a door for everyone else, needs its own `[Rpc.Host]` call to actually take effect. One trap worth flagging: setting `UseLookControls = false` silently disables pressing along with it. See `01_SCENE.md` → *IPressable* and `13_EXAMPLES.md` → *Example 11*.
@@ -610,7 +730,79 @@ public sealed class MyListener : Component, PlayerController.IEvents
 }
 ```
 
-`PostCameraSetup( CameraComponent )` carries **`[Obsolete]`** as of engine 26.08.05. Use `ICameraModifier` in its place: it runs inside the camera's ordered modifier chain, positioned after the player's own view, which itself sits at order 0.
+`PostCameraSetup( CameraComponent )` carries **`[Obsolete]`** as of engine 26.08.05. Use `ICameraModifier` in its place: it runs inside the camera's ordered modifier chain, positioned after the player's own view, which itself sits at order 0. Full signature in *Camera* → *ICameraModifier and CameraView* above.
+
+### MoveMode (`Sandbox.Movement`)
+
+**`PlayerController` is `sealed`** (`PlayerController.cs:10`). You cannot subclass it, so
+the supported way to change how it moves is to add a `MoveMode` component beside it. A
+model that does not know this will try to inherit and fail at the class declaration.
+
+Each tick the controller picks a mode by score:
+`GetComponents<MoveMode>( false ).MaxBy( x => x.Score( this ) )`
+(`PlayerController.Mode.cs:11`). Highest score wins, ties go to whatever `MaxBy` reaches
+last. On a change it calls `OnModeEnd( next )` on the old mode and `OnModeBegin()` on the
+new one, and publishes the winner as `PlayerController.Mode`. The stock modes score
+`MoveModeWalk` at `Priority = 0`, `MoveModeLadder` at `5`, `MoveModeSwim` at `10`, each
+exposed as a `[Property] int Priority` so you can reorder them without code.
+
+```csharp
+public sealed class MoveModeCrawl : MoveMode
+{
+    [Property] public int Priority { get; set; } = 20;
+    [Sync] public bool Crawling { get; set; }
+
+    public override bool AllowGrounding => true;
+    public override bool AllowFalling => true;
+
+    // Negative means "don't pick me". Above MoveModeWalk's 0 means "pick me".
+    public override int Score( PlayerController controller ) => Crawling ? Priority : -1;
+
+    public override Vector3 UpdateMove( Rotation eyes, Vector3 input )
+        => (eyes * input.ClampLength( 1 )) * 40f;
+}
+```
+
+`MoveMode` is `abstract partial class MoveMode : Component` (`Modes/MoveMode.cs:7`) with a
+`[RequireComponent] public PlayerController Controller`, so adding one to a bare GameObject
+pulls in the controller automatically. The surface, all `virtual` unless noted:
+
+| Member | Purpose |
+|:---|:---|
+| `int Score( PlayerController )` | Highest wins. Return a negative number to opt out |
+| `Vector3 UpdateMove( Rotation eyes, Vector3 input )` | Read input, return the wish velocity. Base smooths with `Controller.AccelerationTime` / `DeaccelerationTime` and picks between `WalkSpeed` / `RunSpeed` / `DuckedSpeed` |
+| `void ModifyCamera( ref CameraView view )` | Reshape the view while this mode is active. Runs inside the controller's camera stage, so a mode does **not** join the `ICameraModifier` chain itself |
+| `Transform CalculateEyeTransform()` | Where the eye sits. Base uses `CurrentHeight - EyeDistanceFromTop` and `EyeAngles` |
+| `void PrePhysicsStep()` / `void PostPhysicsStep()` | Around the physics step |
+| `void UpdateRigidBody( Rigidbody body )` | Base toggles gravity off when standing still on static ground and sets linear damping from `BrakePower` / `AirFriction` |
+| `void AddVelocity()` | Base does the accelerate-and-clamp against `GroundFriction` |
+| `void OnModeBegin()` / `void OnModeEnd( MoveMode next )` | Mode transitions |
+| `bool IsStandableSurface( in SceneTraceResult )` | Base returns false |
+| `bool AllowGrounding` / `bool AllowFalling` | Both default `false`. Falling damage and ground detection read these |
+| `void UpdateAnimator( SkinnedModelRenderer )` | Base drives the whole Citizen parameter set, then calls the `protected virtual` `OnUpdateAnimatorVelocity` / `OnUpdateAnimatorState` / `OnUpdateAnimatorLookDirection` / `OnRotateRenderBody`. Override one of those rather than the whole thing |
+| `protected void TrySteppingUp( float )` / `StickToGround( float )` | Helpers onto `Controller.TryStep` / `Reground` |
+
+**`IsStandableSurace` (one `f`) also exists** and is what `IsStandableSurface` calls by
+default (`Modes/MoveMode.cs:129-137`). It is not marked obsolete, so nothing warns you.
+Override the correctly-spelled one.
+
+**`UpdateCamera( CameraComponent )` is `[Obsolete]`** in favour of
+`ModifyCamera( ref CameraView )` (`Modes/MoveMode.Camera.cs:27-31`). It is also not
+`virtual` and its body is empty, so there is nothing to override and nothing to call.
+
+The concrete modes, all in `Sandbox.Movement`:
+
+| Mode | Its properties |
+|:--|:--|
+| `MoveModeWalk` | `Priority` (0), `GroundAngle` (45), `StepUpHeight` (18), `StepDownHeight` (18) |
+| `MoveModeSwim` | `Priority` (10), `SwimLevel` (0.7), read-only `WaterLevel` |
+| `MoveModeLadder` | `Priority` (5), `Speed`, `ClimbableTags` (`TagSet`), `ClimbingObject`, `ClimbingRotation` |
+| `SitMoveMode` (sealed) | No properties. Scores `10000` when `GetComponentInParent<ISitTarget>()` finds a chair, `-1` otherwise (`Modes/Sit.cs:12-20`) |
+
+`ISitTarget` (`Modes/Sit.cs:95-112`) is the interface a chair implements:
+`UpdatePlayerAnimator( PlayerController, SkinnedModelRenderer )`,
+`CalculateEyeTransform( PlayerController )` (first-person eye, not the third-person camera),
+and `AskToLeave( PlayerController )`.
 
 ### Prop
 
@@ -732,8 +924,45 @@ Destroys its own `GameObject` automatically once every child particle and sound 
 | `VolumetricFogVolume` | Volumetric fog rendered in 3D |
 | `EnvmapProbe` (sealed) | A cubemap reflection probe. Properties: `Resolution`, `Parallax`, bounds. |
 | `IndirectLightVolume` (sealed) | A grid of dynamic GI probes |
-| `Terrain` (sealed) | Terrain generated from a heightmap. Properties: `TerrainSize`, `HeightMapSize`, `ClipMapLodLevels`. |
+| `Terrain` (sealed) | Terrain generated from a heightmap. See below. |
 | `MapInstance` | Loads a map (`.vpk` or `.scene`) into the current scene |
+
+### Terrain (sealed)
+
+`Terrain` is a `Collider`, not a plain `Component` (`Scene/Components/Terrain/Terrain.cs:10`),
+so it carries the collider surface as well as its own. Everything authored lives on a
+`TerrainStorage` `GameResource`; the component's size properties are pass-throughs that
+return `0` and silently do nothing when `Storage` is null.
+
+| Member | Type | Notes |
+|:---|:---|:---|
+| `Storage` | `TerrainStorage` | The heightmap asset. Assigning it calls `Create()` |
+| `TerrainSize` | `float` | Uniform world width and length (`Terrain.Properties.cs:94`) |
+| `TerrainHeight` | `float` | World height at heightmap maximum (`:114`) |
+| `ClipMapLodLevels` | `int` | Clamped 1 to 8 (`:147`) |
+| `ClipMapLodExtentTexels` | `int` | Clamped 16 to 2048 (`:154`) |
+| `SubdivisionFactor` | `int` | Clamped 1 to 4; 1 is one vertex per heightmap texel (`:165`) |
+| `MaterialOverride` | `Material` | Needs a shader written against the Terrain Shader API (`:31`) |
+| `RenderType` | `ModelRenderer.ShadowRenderType` | Shadow casting (`:184`) |
+| `Attributes` | `RenderAttributes` | Not saved, not cloned (`:52`) |
+| `HeightMap` | `Texture` | Read-only, GPU-side (`Terrain.Rendering.cs:10`) |
+| `ControlMap` | `Texture` | Read-only, packed base and overlay material index plus blend (`:11`) |
+
+Methods: `Create()` rebuilds the textures, the clipmap scene object and the collider,
+call it after mutating `Storage` by hand (`Terrain.cs:130`).
+`RayIntersects( Ray ray, float distance, out Vector3 position )` and the four-argument
+overload with `out Vector3 normal` return the **local** hit position, not world
+(`Terrain.cs:171` and `:179`). `GetMaterialAtWorldPosition( Vector3 worldPosition )`
+returns a nullable `Terrain.TerrainMaterialInfo` carrying `BaseTextureId`,
+`OverlayTextureId`, `BlendFactor`, `IsHole`, `BaseMaterial`, `OverlayMaterial` plus
+`GetDominantMaterial()` and `GetDominantMaterialIndex()`, and is null outside the terrain
+(`Terrain.MaterialQuery.cs:8-60`).
+
+**There is no `HeightMapSize`.** Resolution lives on the storage asset as
+`TerrainStorage.Resolution`, set through `SetResolution( int )`, and the heightmap and
+control map are `Resolution * Resolution` arrays (`Resources/Terrain/TerrainStorage.cs:127-221`).
+`HeightMapSize` survives only as a legacy JSON key the upgrader reads
+(`TerrainStorage.Upgrade.cs:19`).
 
 ***
 

@@ -2,7 +2,7 @@
 
 # s&box MCP Server
 
-**Eleven MCP tools for the s&box editor, for when you edit a file and nothing happens.**
+**Eighteen MCP tools for the s&box editor, for when you edit a file and nothing happens.**
 
 [![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a?style=flat-square)](https://sbox.game)
 [![Licence](https://img.shields.io/badge/licence-MIT-3fb950?style=flat-square)](../LICENSE)
@@ -19,7 +19,7 @@
 
 The s&box editor already ships an MCP server with its own toolsets (`editor`, `asset`, `scene`,
 `component`, `package`, `play`, `log`). This file adds one more, registered as `sbox_mcp_server`,
-with eleven tools in three groups: ask the running engine what is actually true, ask the editor
+with eighteen tools in three groups: ask the running engine what is actually true, ask the editor
 what it currently believes, and make it notice a change on disk.
 
 | Tool | Group | What it does |
@@ -27,17 +27,29 @@ what it currently believes, and make it notice a change on disk.
 | `project_find_type` | Ask the engine | Looks up a type by name in the loaded engine and reports what it is, so you know whether an API exists before you write it |
 | `project_type_members` | Ask the engine | Lists a type's real methods and properties, read straight from the running engine |
 | `project_input_actions` | Ask the engine | Lists every input action the project defines, with keyboard and gamepad bindings |
+| `project_find_member` | Ask the engine | Searches every loaded type for a member by name fragment, for when you know the method but not what it hangs off |
+| `project_enum_values` | Ask the engine | Lists an enum's named values, which `project_type_members` cannot because an enum has no methods or properties |
+| `project_console_commands` | Ask the engine | Lists the project's console commands with their real argument list, so a wrong form does not just print usage and change nothing |
+| `project_content_path` | Ask the engine | Resolves a content path against the mounted filesystem, before a typo silently loads the error model |
+| `project_content_search` | Ask the engine | Lists what the mounted set actually ships under a directory, for when a manifest and the mount disagree |
 | `project_info` | Ask the editor | Reports which project is open and the compiler settings currently live in memory |
 | `project_compilers` | Ask the editor | Lists each compiler's build state: `IsBuilding`, `NeedsBuild`, `BuildSuccess` |
 | `project_source_changes` | Ask the editor | Reports what each compiler has actually noticed since its last build |
 | `project_compile_errors` | Ask the editor | Returns compile diagnostics as rows with file and line, instead of console text to scrape |
+| `project_assembly_freshness` | Ask the editor | Compares the assembly each compiler emitted against the one the process is actually serving, because recompiling does not cure a stale one |
+| `project_package_references` | Ask the editor | Reconciles the `.sbproj` package references against what is installed, since `install_package` writes nothing |
 | `project_reload_config` | Change something | Re-reads the `.sbproj` from disk into the live config and recreates the compilers |
 | `project_reload_settings` | Change something | Drops the cached `ProjectSettings`, so `Input.config` and friends are re-read from disk |
 | `project_rebuild` | Change something | Recreates every compiler and starts a build. Returns immediately |
 | `project_build` | Change something | Rebuilds and waits, then reports success plus any errors |
 
-The seven "ask" tools carry `McpToolHints.ReadOnly`, so a client can run them without stopping
-to ask permission. The four "change something" tools do not, since they touch live state.
+The fourteen "ask" tools carry `McpToolHints.ReadOnly`, so a client can run them without
+stopping to ask permission. The four "change something" tools do not, since they touch live
+state.
+
+Note that the read-only hint never reaches a client's tool list for a third-party toolset:
+listing is gated on an attribute internal to the engine, so these are reached through
+`search_tools` and `call_tool` instead. Search `project_` and they come back.
 
 <br>
 
@@ -57,7 +69,7 @@ Code living there is unsandboxed, which is what lets this reach internal engine 
 Restart the editor, then:
 
 ```
-list_toolsets       → sbox_mcp_server, eleven tools
+list_toolsets       → sbox_mcp_server, eighteen tools
 describe_toolset    → full input schemas
 ```
 
@@ -107,6 +119,59 @@ the editor's own in-memory state rather than the engine's type system. This is w
 the only four that write state, which is why they are the only four without the read-only hint.
 
 ---
+
+## Why each tool exists
+
+The source file is deliberately thin on commentary, at under 5% comment lines. The reasoning
+lives here instead, once, where it can be maintained.
+
+Six engine behaviours can swallow an edit or an authored value without raising anything. Each
+one leaves you having changed a file, seen no error, and concluded the change was wrong when it
+simply never arrived.
+
+| What you changed | Why nothing happened | The tool |
+|---|---|---|
+| `.sbproj` | Read once at editor boot. Nothing watches it, so a `Metadata.Compiler` edit never reaches Roslyn | `project_reload_config` |
+| `ProjectSettings/*.config` | Cached on first read and never invalidated, so an edited `Input.config` keeps serving the old actions | `project_reload_settings` |
+| A `.cs` file | Compiler file watchers stop firing once the compilers are recreated in-process | `project_rebuild`, `project_build` |
+| A content path in an authored asset | `Model.Load` returns the engine's **error model**, non-null with `IsError` set, so a null check never fires and the world ships orange | `project_content_path` |
+| Nothing, you pulled a branch | The process serves whatever assembly it loaded at boot. A rebuild does not cure it and `compile_status` reads green throughout | `project_assembly_freshness` |
+| Installed a package over MCP | `install_package` mounts for the session and writes nothing to the `.sbproj`, so it silently is not there next boot | `project_package_references` |
+
+Two more close gaps rather than traps. `project_console_commands` and `project_input_actions`
+cover the two string surfaces that fail silently when misspelled: a wrong console argument form
+prints usage and changes nothing, which from outside is indistinguishable from having run.
+`project_enum_values` exists because `project_type_members` reports zero methods and zero
+properties for an enum, which reads as "the type is empty" rather than "wrong tool".
+
+### Three implementation details worth knowing
+
+**`project_reload_config` clears a cached hash first.** `Project.UpdateCompiler()` early-returns
+when `CompilerHash` still matches `lastCompilerHash`, and that hash covers only the compile
+settings, org, ident, type, the standalone flag and package references. Without zeroing it, an
+edit to anything else is a silent no-op, and the tool would still report the freshly loaded
+settings and look like it had worked.
+
+**`project_reload_settings` does more than clear the cache.** Clearing alone changes nothing for
+input actions: `Input.GetActions()` reads a static field that only `Input.ReadConfig` ever
+assigns, and nothing calls it on a settings reload. The tool calls it, and reports the action
+count before and after so you can see the file actually parsed.
+
+**`project_compilers` reads `Output?.Successful`, not `BuildSuccess`.** The latter is
+`Output?.Successful ?? false`, which cannot tell a build that failed from one that has never
+run. The nullable form can, and the tool reports the difference.
+
+### On discoverability
+
+These tools never appear in a client's `tools/list`. Listing is gated on `[McpListed]`, which is
+`internal` to the engine, so only the editor's own seven top-level tools are listed. That is
+deliberate on Facepunch's part: a list a client fetched once never goes stale as addon code
+hotloads.
+
+The practical consequence is that **each tool's XML summary is its entire discovery surface**,
+because `search_tools` matches against the name and that description. That is why the summaries
+in the source are the one category of comment kept, and why they are written as search targets
+rather than as documentation.
 
 ## Which one to reach for
 

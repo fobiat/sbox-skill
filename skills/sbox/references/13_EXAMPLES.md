@@ -1269,7 +1269,7 @@ Catch yourself writing any of these, and stop.
 | Clearing a `NetList<T>` by reassigning the property | `list.Clear()` | A freshly assigned list never gets wired into the network table, and it loses its proxy guard in the process. |
 | `[Change]` on a `NetList` / `NetDictionary` property | Subscribe to the collection's `OnChanged` field instead | `[Change]` only wraps the property setter, so mutating individual elements never trips it. |
 | `[GameResource( "Title", "ext", "desc" )]` | `[AssetType( Name = ..., Extension = ... )]` | Obsolete across the whole engine, and a build failure the moment `TreatWarningsAsErrors` is on. |
-| Calling `Model.Load(path)` and skipping the null check | Check for null and fall back to `Model.Error` | A path that fails to resolve comes back null, not the placeholder model. |
+| `if ( Model.Load( path ) is null )`, or `authored ?? Model.Load( fallback )` | `if ( model is null \|\| model.IsError )` | A bad path can come back either way. Null-only misses the error model, which is non-null, so `??` passes it straight through and the object ships orange. See `15_API_CORE.md` → *Model*. |
 | Reaching for `Prop` on something purely decorative or non-destructible | `ModelRenderer` + `ModelCollider` (+ `Rigidbody`) | `Prop` drags along synced `Health`, `IDamageable`, and gib behavior nobody asked for. |
 
 ***

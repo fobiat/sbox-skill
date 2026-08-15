@@ -1,8 +1,18 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Connecting an agent to the editor
+    url: https://github.com/fobiat/sbox-skill/blob/main/QUICKSTART.md
+    about: >-
+      The editor's MCP server listens on http://127.0.0.1:7269/mcp. If your agent
+      cannot see the toolset at all, start here rather than filing.
   - name: s&box documentation
     url: https://sbox.game/dev/doc/
     about: Official engine documentation. Check here before reporting an API as wrong.
   - name: s&box forums
     url: https://sbox.game/f/
     about: Engine questions that are not about this skill.
+  - name: Facepunch engine source
+    url: https://github.com/Facepunch/sbox-public
+    about: >-
+      The managed source every reference file is derived from. If you want to
+      confirm a signature yourself, it is in here.

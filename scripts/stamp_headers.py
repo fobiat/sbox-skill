@@ -12,6 +12,11 @@
 #  In SKILL.md the block goes after the YAML frontmatter, never before it. The
 #  skill loader reads frontmatter only when it opens the file, so anything above
 #  it stops the skill from registering at all.
+#
+#  Line endings are read and written verbatim. read_text/write_text would have
+#  rewritten every file to os.linesep, which is a whole-file diff on any machine
+#  whose checkout convention differs from the last person to run this. See
+#  .gitattributes.
 # =============================================================================
 
 import re
@@ -24,7 +29,10 @@ ENGINE = "26.08.05"
 AUTHOR = "fobiat (Kyle Tarff) <kyle@fobiat.dev>"
 LINKS = "https://fobiat.dev/   https://github.com/fobiat"
 
-BLOCK = re.compile(r"\A<!--\n  s&box Skill.*?-->\n\n?", re.DOTALL)
+# Tolerant of indentation and of a reflowed opening line, because a header that
+# fails to match is a header that gets prepended a second time.
+STAMP = re.compile(r"<!--\s*s&box Skill\s*:.*?-->", re.DOTALL)
+LEADING_STAMP = re.compile(r"\A\s*<!--\s*s&box Skill\s*:.*?-->[ \t]*\n*", re.DOTALL)
 
 PURPOSE = {
     "SKILL.md": "Router. Identifies which reference file answers the task and sends the reader there.",
@@ -64,6 +72,12 @@ def header(name):
     )
 
 
+def read_preserving_eol(path):
+    raw = path.read_text(encoding="utf-8", newline="")
+    eol = "\r\n" if "\r\n" in raw else "\n"
+    return raw.replace("\r\n", "\n"), eol
+
+
 def split_frontmatter(text):
     if not text.startswith("---\n"):
         return "", text
@@ -74,16 +88,25 @@ def split_frontmatter(text):
 
 
 def stamp(path):
-    text = path.read_text(encoding="utf-8")
+    text, eol = read_preserving_eol(path)
     frontmatter, body = split_frontmatter(text)
-    body = BLOCK.sub("", body)
+
+    while LEADING_STAMP.match(body):
+        body = LEADING_STAMP.sub("", body, count=1)
+
+    # Anything left is a stamp somewhere in the middle of the file, which this
+    # script did not put there and must not silently delete.
+    duplicate = STAMP.search(body)
+    if duplicate:
+        line = body.count("\n", 0, duplicate.start()) + 1
+        return False, line
 
     new = frontmatter + ("\n" if frontmatter else "") + header(path.name) + body
     if new == text:
-        return False
+        return False, None
 
-    path.write_text(new, encoding="utf-8")
-    return True
+    path.write_text(new.replace("\n", eol), encoding="utf-8", newline="")
+    return True, None
 
 
 def main():
@@ -93,7 +116,20 @@ def main():
         print(f"FAIL: no purpose line for {', '.join(missing)}")
         return 1
 
-    changed = sum(stamp(path) for path in targets)
+    changed = 0
+    duplicates = []
+    for path in targets:
+        was_changed, duplicate_line = stamp(path)
+        changed += was_changed
+        if duplicate_line:
+            duplicates.append(f"{path.relative_to(ROOT)}: second header at body line {duplicate_line}")
+
+    if duplicates:
+        print(f"FAIL: {len(duplicates)} file(s) carry a header below the first one\n")
+        for message in duplicates:
+            print(f"  {message}")
+        return 1
+
     print(f"OK: stamped {len(targets)} files, {changed} changed")
     return 0
 

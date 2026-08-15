@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 512" width="910" height="512" role="img" aria-label="s&amp;box MCP Server">
+  <title>s&amp;box MCP Server</title>
+  <rect width="910" height="512" fill="#181818"/>
+  <rect width="910" height="6" fill="#2BB88E"/>
+  <g transform="translate(96,140) scale(3.5)">
+    <rect width="64" height="64" rx="10.7" fill="#202020"/>
+    <rect x="0.5" y="0.5" width="63" height="63" rx="10.2" fill="none" stroke="#3E3E3E" stroke-width="1"/>
+    <g stroke="#656565" stroke-width="3" stroke-linecap="round">
+      <line x1="23.34" y1="44.5" x2="13.81" y2="50"/>
+      <line x1="40.66" y1="44.5" x2="50.19" y2="50"/>
+    </g>
+    <line x1="32" y1="29.5" x2="32" y2="21.5" stroke="#00A8E8" stroke-width="3.4" stroke-linecap="round"/>
+    <path d="M32 12.5 L37.5 22 L26.5 22 Z" fill="#00A8E8"/>
+    <path d="M32 47.5 A 8 8 0 1 1 40 39.5" fill="none" stroke="#2BB88E" stroke-width="2.6" stroke-linecap="round"/>
+    <circle cx="32" cy="39.5" r="3" fill="#2BB88E"/>
+  </g>
+  <text x="376" y="252" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#EEF3F1"><tspan fill="#9E9E9E">s&amp;box</tspan></text>
+  <text x="376" y="322" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#EEF3F1">MCP Server</text>
+  <text x="378" y="374" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="26" font-weight="500" fill="#2BB88E">fobiat</text>
+  <text x="378" y="424" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="22" font-weight="500" fill="#9E9E9E">github.com/fobiat/sbox-skill</text>
+</svg>

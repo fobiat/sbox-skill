@@ -18,7 +18,9 @@ and how mounted content reaches game code. Read out of engine source at version 
 `engine/Sandbox.Engine/Game/Services/Achievements/`, `engine/Sandbox.Services/Api/`,
 `engine/Sandbox.Engine/Systems/Filesystem/`, `engine/Sandbox.Filesystem/BaseFileSystem.cs`,
 `engine/Sandbox.Engine/Systems/Cookies/Cookie.cs`, `engine/Sandbox.Engine/Services/Packages/`,
-`engine/Sandbox.Access/Rules/BaseAccess.cs`.
+`engine/Sandbox.Engine/Systems/Filesystem/Storage/`, `engine/Sandbox.Engine/Game/PartyRoom/`,
+`engine/Sandbox.Engine/Core/Internal/IModalSystem.cs`,
+`engine/Sandbox.Engine/Utility/Json/`, `engine/Sandbox.Access/Rules/BaseAccess.cs`.
 
 ---
 
@@ -304,6 +306,172 @@ anything here you can't afford to lose or regenerate.
 
 ---
 
+## Sandbox.Json
+
+`WriteJson` / `ReadJson` above go through `Sandbox.Json`, and so should anything you serialize
+by hand. `System.Text.Json.JsonSerializer` is whitelisted (`BaseAccess.cs:257`) so calling it
+compiles, but it runs with **default options** and will not round-trip an engine type: a
+`Vector3`, a `Color`, an `Angles`, a `Model` reference, an `ActionGraph`, or anything
+implementing `IJsonConvert`. `Sandbox.Json` is the same serializer configured with
+`GlobalContext.Current.JsonSerializerOptions` (`Utility/Json/Json.cs:17`), which has all of that
+registered.
+
+```csharp
+var text  = Json.Serialize( myObject );        // null in, null out
+var back  = Json.Deserialize<SaveDoc>( text ); // throws on malformed
+```
+
+| Member | Signature | Notes |
+| :-- | :-- | :-- |
+| `Serialize` | `( object source )` → `string` | Returns `null` when `source` is null |
+| `Serialize<T>` | `( Utf8JsonWriter writer, T target )` | Streaming overload; also `( writer, object, Type )` |
+| `Deserialize<T>` | `( string source )` | Throws on malformed input |
+| `Deserialize` | `( string source, Type t )` | And `( ref Utf8JsonReader, ... )` for both |
+| `TryDeserialize<T>` | `( string source, out T obj )` → `bool` | Catches everything, returns false |
+| `TryDeserialize` | `( string source, Type t, out object obj )` → `bool` | |
+| `ParseToJsonObject` | `( string json )` → `JsonObject` | Also takes a `ref Utf8JsonReader` |
+| `ToNode` | `( object obj )` / `( object obj, Type type )` → `JsonNode` | |
+| `FromNode<T>` | `( JsonNode node )` | And `FromNode( JsonNode, Type )` |
+
+Use `TryDeserialize` on the load path. `Deserialize<T>` throwing inside `OnStart` takes the
+whole component down.
+
+### Making a custom `[Property]` type serialize
+
+Two interfaces, and they solve different problems.
+
+**`IJsonConvert`** replaces the whole representation, using static abstract members so no
+converter needs registering:
+
+```csharp
+public struct Coord : IJsonConvert
+{
+    public int X, Y;
+
+    public static object JsonRead( ref Utf8JsonReader reader, Type typeToConvert )
+        => Parse( reader.GetString() );
+
+    public static void JsonWrite( object value, Utf8JsonWriter writer )
+        => writer.WriteStringValue( $"{((Coord)value).X},{((Coord)value).Y}" );
+}
+```
+
+`JsonConvertFactory` picks up any type assignable to `IJsonConvert`
+(`Utility/Json/IJsonConvert.cs:15-27`), so implementing the interface is the entire wiring.
+
+**`IJsonPopulator`** keeps normal property serialization but lets an *existing instance* be
+filled from a node rather than replaced, which is what you want for a class that owns
+subscriptions or engine handles:
+
+```csharp
+public interface IJsonPopulator
+{
+    JsonNode Serialize();
+    void Deserialize( JsonNode node );
+}
+```
+
+---
+
+## Versioned Save Documents
+
+`FileSystem.Data` gives you bytes. Everything below is the shape that keeps those bytes
+readable after the game ships and the schema moves. None of it is engine machinery; it is the
+pattern that survives contact with a rolling update, written down because every real project
+reinvents it badly first.
+
+```csharp
+public sealed class ProfileDoc
+{
+    public const int CurrentVersion = 3;
+
+    public int Version { get; set; } = CurrentVersion;
+
+    public string DisplayName { get; set; } = "";
+    public int Level { get; set; } = 1;
+    public List<string> Unlocks { get; set; } = new();   // added in v2
+    public LoadoutDoc Loadout { get; set; }              // added in v3
+}
+```
+
+**Migrate with a monotone ladder, one `if` per version step.**
+
+```csharp
+static void Migrate( ProfileDoc doc )
+{
+    if ( doc.Version < 2 )
+    {
+        // Unlocks' own initializer is the migration. Nothing to write here except the stamp.
+        doc.Version = 2;
+    }
+
+    if ( doc.Version < 3 )
+    {
+        doc.Loadout = LoadoutDoc.Default();
+        doc.Version = 3;
+    }
+}
+```
+
+Each block runs, stamps, and falls through to the next, so a v1 document walks the whole chain
+in one pass. **A field whose default is correct needs no migration code at all**, because the
+property initializer already produced it before deserialization ran. Only a field whose correct
+value depends on the old data earns a line.
+
+**Clamp a newer document down rather than trusting or rejecting it.** A player who ran a newer
+build, or who synced a save from another machine, will hand you a `Version` above yours. Loading
+it as-is means reading fields your code does not understand and writing back a document that
+silently drops them; refusing it outright loses the save.
+
+```csharp
+if ( doc.Version > ProfileDoc.CurrentVersion )
+    doc.Version = ProfileDoc.CurrentVersion;
+```
+
+**Re-null-check every collection and nested document unconditionally after deserialize.** A
+property initializer runs *before* the deserializer, and an explicit `null` in the JSON beats
+it: `{"Unlocks": null}` leaves you with a null list even though the property said `= new()`.
+That JSON exists in the wild the moment anything ever wrote it, including an earlier version of
+your own save code.
+
+```csharp
+public static ProfileDoc Decode( string json )
+{
+    if ( string.IsNullOrWhiteSpace( json ) ) return null;
+    if ( !Json.TryDeserialize<ProfileDoc>( json, out var doc ) || doc is null ) return null;
+    if ( doc.Version <= 0 ) return null;                       // not one of ours
+
+    if ( doc.Version > ProfileDoc.CurrentVersion )
+        doc.Version = ProfileDoc.CurrentVersion;
+
+    Migrate( doc );
+
+    doc.Unlocks ??= new();                                     // beats an explicit JSON null
+    doc.Loadout ??= LoadoutDoc.Default();
+    doc.Loadout.Slots ??= new();                               // nested, same rule
+
+    return doc;
+}
+```
+
+**`Decode` returns null for blank, malformed and unrecognised input, never an empty document.**
+The difference matters at the call site: a null means "there is no save here or it is not
+readable", which the caller can log, back up and start fresh from. An empty-but-valid document
+means "this player has nothing", which is a legitimate state you never want a parse failure to
+impersonate. A corrupt save that silently becomes a fresh profile is a bug report you will never
+be able to reproduce.
+
+**Chain nested documents.** Give each nested type its own `CurrentVersion`, `Version` and
+migration ladder, and call the child's migration from the parent's. A nested document that
+shares the parent's version number cannot be reused anywhere else and forces a parent version
+bump every time a leaf field changes.
+
+This whole pattern pairs with the networking one in `04_NETWORKING.md` →
+*A `[Sync] string` snapshot versus a `NetList`*: the same versioned `Encode`/`Decode` envelope
+serves both the save file and the replicated copy, so the two never drift.
+
+---
+
 ## Package
 
 `Sandbox.Package` represents an asset on the backend (a game, map, model, addon, etc). Most game
@@ -390,6 +558,189 @@ something running game code calls at runtime. Don't confuse it with `FileSystem.
 
 ---
 
+## The Rest of the Backend Surface
+
+Stats, leaderboards and achievements are the parts of the backend most games touch, but they are
+not all of it. **Watch the namespaces**: only some of these live in `Sandbox.Services`.
+
+| Type | Namespace | For |
+| :-- | :-- | :-- |
+| `Storage` | `Sandbox` | Cloud-saved and workshop-published content bundles |
+| `Inventory` | `Sandbox.Services` | Steam Inventory items and their definitions |
+| `Screenshots` | `Sandbox.Services` | Steam screenshot library (no public members, see below) |
+| `ServerList` | `Sandbox.Services` | Querying the Steam master server list |
+| `PartyRoom` | `Sandbox` | A Steam lobby of friends that travels between games |
+| `Game.Overlay` | `Sandbox` | Opening the platform's own modals |
+
+### Storage
+
+`Storage` bundles a set of files into an entry with an id, a type, a timestamp, metadata and a
+thumbnail, then either keeps it locally or publishes it to the Steam Workshop. This is what
+"dupes", saved builds, custom maps and player-made content ride on.
+
+```csharp
+var entry = Storage.CreateEntry( "dupe" );      // "dupe", "save", whatever you call it
+entry.Files.WriteJson( "contents.json", build );
+entry.SetMeta( "PieceCount", build.Pieces.Count );
+entry.SetThumbnail( bitmap );
+
+var mine = Storage.GetAll( "dupe" );            // Entry[]
+```
+
+`Storage.Entry` (`Systems/Filesystem/Storage/Storage.Entry.cs`):
+
+| Member | Signature |
+| :-- | :-- |
+| `Id` / `Type` / `Created` | `string` / `string` / `DateTimeOffset`, all get-only |
+| `Files` | `BaseFileSystem`, the entry's own writable folder |
+| `SetMeta<T>` / `GetMeta<T>` | `( string key, T value )` / `( string key, T defaultValue = default )` |
+| `Thumbnail` | `Texture` |
+| `SetThumbnail` | `( Bitmap bitmap )` |
+| `Delete` | `()` |
+| `Publish` | `( string title = "Unnammed", string[] tags = null, Dictionary<string,string> keyvalues = null )` |
+| `Publish` | `( WorkshopPublishOptions options )` |
+
+Reading other people's entries goes through `Storage.Query`
+(`Storage.Query.cs:37-116`), which is a plain object you fill in and `Run`:
+
+```csharp
+var result = await new Storage.Query
+{
+    TagsRequired = { "vehicle" },
+    SortOrder    = Storage.SortOrder.RankedByTrend,
+    RankTrendDays = 7,
+}.Run();
+
+foreach ( var item in result.Items )
+    Log.Info( $"{item.Title} by {item.Owner?.Name} ({item.VotesUp}+)" );
+
+var installed = await result.Items[0].Install();   // → Storage.Entry
+```
+
+`Query` carries `FileIds`, `TagsRequired`, `TagsExcluded`, `KeyValues`, `SearchText`,
+`MaxCacheAge`, `SortOrder`, `Author` and `RankTrendDays`. `QueryResult` carries `ResultCount`,
+`TotalCount`, `NextCursor`, `Items`, plus `HasMoreResults()` and `GetNextResults()` for paging.
+`QueryItem` is the metadata-only record (title, description, votes, tags, keyvalues, owner
+`Profile`, sizes, timestamps) and only `Install()` actually downloads.
+
+`Storage.Visibility` is `Public` / `FriendsOnly` / `Private` / `Unlisted`, matching Steam's
+`ERemoteStoragePublishedFileVisibility`. `Storage.SortOrder` has 20 values, mirroring Steam's
+UGC query orders (`RankedByVote`, `RankedByPublicationDate`, `RankedByTrend`,
+`RankedByLastUpdatedDate` and friends).
+
+### Inventory
+
+Steam Inventory, for games that sell items. Most of the class is `internal`: `Refresh` and
+`CheckOut` are engine-driven, so game code reads rather than writes.
+
+| Member | Signature |
+| :-- | :-- |
+| `Inventory.Items` | `IReadOnlyCollection<Item>`, what this user owns |
+| `Inventory.HasItem` | `( int inventoryDefinitionId )` → `bool` |
+| `Inventory.Definitions` | `IReadOnlyCollection<ItemDefinition>` |
+| `Inventory.FindDefinition` | `( int definitionId )` → `ItemDefinition` |
+| `Item` | `ItemId` (`ulong`), `DefinitionId` (`int`), `Definition` |
+| `ItemDefinition` | `Id`, `Name`, `Description`, `IconUrl`, `IconUrlLarge`, `PackageIdent`, `Category`, `Rarity`, `Asset`, `StoreHidden`, `SellStart`/`SellEnd`, `Price`/`BasePrice` (`CurrencyValue`) |
+
+### Screenshots
+
+`Sandbox.Services.Screenshots` is public but its only member,
+`AddScreenshotToLibrary( ReadOnlySpan<byte>, int, int )`, is `internal`. There is nothing here
+for game code to call in 26.08.05; it exists so the engine's own screenshot key can write into
+the Steam library.
+
+### ServerList
+
+```csharp
+using var list = new ServerList();
+list.AddFilter( "map", "de_dust" );
+list.Query();
+// list is itself a List<ServerList.Entry>, filled as responses arrive
+```
+
+`ServerList` derives from `List<ServerList.Entry>` and is `IDisposable`; dispose it or the
+native query leaks. `IsQuerying` goes false when the sweep completes. `Entry` carries
+`IPAddressAndPort`, `SteamId`, `Map`, `Game`, `GameVersion`, `Name`, `Tags`, `Players`,
+`MaxPlayers`, `Ping` and `Tick`. The constructor already filters on the network protocol
+version, so you only ever see servers this build can actually join.
+
+For the in-game browser, prefer `Game.Overlay.ShowServerList( new ServerListConfig( game, map ) )`
+and let the platform draw it.
+
+### PartyRoom
+
+A `PartyRoom` is a Steam lobby that persists across games: friends group up in the menu, then
+travel together into whatever gets launched. `PartyRoom.Current` is null when the local player
+is not in one.
+
+| Member | Signature |
+| :-- | :-- |
+| `PartyRoom.Current` | `static PartyRoom`, get-only |
+| `PartyRoom.Create` | `( int maxMembers )` / `( int maxMembers, string name, bool ispublic )` → `Task<PartyRoom>` |
+| `PartyRoom.Find` | `()` → `Task<Entry[]>`, public parties |
+| `Id` / `Name` / `MaxMembers` / `MemberCount` | `SteamId` / `string` / `int` / `int` |
+| `Members` | `IEnumerable<Friend>` |
+| `Owner` | `Friend`, get-only |
+| `SetOwner` | `( SteamId friend )` → `bool` |
+| `Kick` | `( SteamId friend )` |
+| `SendChatMessage` | `( string text )` |
+| `Leave` | `()` |
+| `PackageIdent` | `string`, what the party is playing |
+| `JoinState` | `OwnerJoinState`, where the owner is in the join sequence |
+| `VoiceRecording` | `bool`, party voice mic on/off |
+| `VoiceCommunicationAllowed` | `bool`, false once a game instance exists |
+
+Events are assignable delegates, not C# events, so **assigning replaces whatever was there**:
+
+```csharp
+public Action<Friend, string> OnChatMessage { get; set; }
+public Action<Friend>         OnJoin { get; set; }
+public Action<Friend>         OnLeave { get; set; }
+public Action<Friend, byte[]> OnVoiceData { get; set; }
+```
+
+Use `+=` rather than `=` if anything else might already be listening, and clear your handler
+when your panel or component goes away. `PartyRoom.IEventListener` exists for the same events as
+an interface if you would rather not hold a delegate at all.
+
+### Platform Modals: `Game.Overlay`
+
+The platform's own UI is reachable from game code through `Game.Overlay`
+(`Game/Game/Game.Overlay.cs`). The interface behind it, `Sandbox.Modals.IModalSystem`, has an
+`internal static Current`, so `Game.Overlay` is the entry point, not `IModalSystem`.
+
+```csharp
+Game.Overlay.ShowPackageModal( "facepunch.sandbox" );
+Game.Overlay.ShowPlayer( steamId );
+Game.Overlay.ShowFriendsList( new FriendsListModalOptions { ShowOfflineMembers = false } );
+Game.Overlay.ShowServerList( new ServerListConfig( game: "myorg.mygame" ) );
+if ( Game.Overlay.IsOpen ) { /* pause input */ }
+```
+
+Others: `ShowGameModal`, `ShowMapModal`, `ShowNewsModal`, `ShowOrganizationModal`,
+`ShowReviewModal`, `ShowReportModal`, `ShowPackageSelector`, `ShowMapSelector`,
+`ShowSettingsModal( page )`, `ShowBinds`, `ShowPlayerList`, `ShowPauseMenu`, `CreateGame`,
+`WorkshopPublish`, `Close`, `CloseAll`, plus `IsPauseMenuOpen`.
+
+The option structs live in `Sandbox.Modals`:
+
+- **`WorkshopPublishOptions`**: `Title`, `Description`, `Thumbnail` (`Bitmap`, 512x512, no
+  transparency), `StorageEntry` (`Storage.Entry`, the files being published), `KeyValues`,
+  `Tags`, `Metadata` (a string readable from a query *before* download), `Visibility`
+  (default `Public`), `CanSelectVisibility`, `PublishedFileId` (set it to update an existing
+  item instead of creating one), `OnComplete( ulong publishedFileId )`, and
+  `AddCategory<TEnum>( string name )` which prompts the user to pick an enum value and stores
+  it as `KeyValues[name]`.
+- **`FriendsListModalOptions`**: `ShowOfflineMembers`, `ShowOnlineMembers`, and `Anchor`
+  (`Anchoring { Panel, Position, Offset }`) to hang the modal off a button instead of centring it.
+- **`CreateGameOptions`**: `Package`, `OnComplete( CreateGameResults )`. `CreateGameResults`
+  hands back `GameSettings`, `Map`, `MaxPlayers`, `ServerName`, `Privacy`. Those `GameSettings`
+  are the `ConVarFlags.GameSetting` convars your game published; see `17_CONSOLE.md`.
+- **`ServerListConfig`**: `GamePackageFilter`, `MapPackageFilter`, or the
+  `ServerListConfig( game, map )` constructor.
+
+---
+
 ## Gotchas
 
 - **Stats submitted from a dedicated server go nowhere.** They queue locally, then
@@ -418,6 +769,23 @@ something running game code calls at runtime. Don't confuse it with `FileSystem.
 
 - **`FileSystem.Cache` can vanish at any time**, by design. It's for regenerable/derived data
   only (thumbnails, decoded assets, anything you can rebuild), never for save data.
+
+- **A property initializer does not survive an explicit JSON `null`.** `= new()` on a
+  collection runs before deserialization, and `{"Unlocks": null}` overwrites it. Re-null-check
+  every collection and nested document after `Deserialize`, unconditionally, every time.
+
+- **`JsonSerializer` compiles but drops engine types.** It is whitelisted, so nothing stops
+  you, and a `Vector3` or a `Model` reference will not round-trip. Use `Sandbox.Json`.
+
+- **`Storage` is `Sandbox.Storage`, not `Sandbox.Services.Storage`.** Same for `PartyRoom`.
+  Only `Stats`, `Leaderboards`, `Achievements`, `Inventory`, `Screenshots` and `ServerList`
+  actually live under `Sandbox.Services`.
+
+- **`ServerList` is `IDisposable` and holds a native query.** `using var list = new ServerList();`
+  or you leak it.
+
+- **`PartyRoom`'s events are settable properties, not C# events.** `OnJoin = handler` throws
+  away whoever was listening. Use `+=`, and unsubscribe when the listener dies.
 
 - **Leaderboard refreshes serialize across the whole process.** `Board2.Refresh()` shares one
   static semaphore across every leaderboard instance. Firing off several boards in parallel

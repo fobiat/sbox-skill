@@ -1,0 +1,79 @@
+name: Toolset or tool bug
+description: A tool in the sbox_mcp_server toolset failed, returned something wrong, or the toolset did not register at all.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Two things trip people up before they get to a real bug, so check them first.
+
+        **The toolset never appears in your client's tool list.** That is expected and not
+        fixable. Listing is gated on an attribute that is internal to the engine, so a
+        third-party toolset is reachable only through `search_tools`, `describe_toolset`
+        and `call_tool`. Run `search_tools` with `project_` and you should see eleven.
+
+        **A failed call comes back as a normal result carrying `isError`**, not as a
+        protocol error. Read the result body rather than expecting an exception.
+  - type: input
+    id: tool
+    attributes:
+      label: Which tool
+      placeholder: project_reload_settings
+    validations:
+      required: true
+  - type: input
+    id: engine
+    attributes:
+      label: Engine version
+      description: Bottom of the editor window, or call editor_status.
+      placeholder: "26.08.05"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed
+      options:
+        - Package reference (fobiat.sbox_mcp_server)
+        - Copied SboxMcpServer.cs into my Editor/ folder
+        - Claude Code plugin
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: called
+    attributes:
+      label: What you called
+      description: The tool name and the arguments you passed.
+      render: json
+    validations:
+      required: true
+  - type: textarea
+    id: got
+    attributes:
+      label: What came back
+      description: Paste the whole result, including `isError` if it is there.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Editor console
+      description: >
+        Call read_console, or copy from the editor's console panel. A tool that
+        reaches an engine member that has been renamed throws the member name, so
+        that line is the whole answer if it is there.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before you file
+      options:
+        - label: The toolset shows up in search_tools
+        - label: I restarted the editor after installing or updating the file
+        - label: The project compiles (compile_status reports success)
