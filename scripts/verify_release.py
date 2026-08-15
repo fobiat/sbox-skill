@@ -85,7 +85,8 @@ LEAKS = (
 )
 LEAK_PATTERNS = [(text, re.compile(text, re.IGNORECASE)) for text in LEAKS]
 
-BINARY_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".dll", ".vpk")
+BINARY_SUFFIXES = (".png", ".jpg", ".jpeg", ".gif", ".ico", ".pdf", ".zip", ".dll", ".vpk",
+                   ".mp4", ".webm")
 
 failures = []
 notes = []

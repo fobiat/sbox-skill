@@ -74,5 +74,26 @@ local `Editor/` folder, and only step 4 exercises it. If the tools do not appear
 file-drop install in [`editor-mcp/README.md`](../editor-mcp/README.md) is still the supported
 path and nothing is lost.
 
+## The listing art
+
+Everything the page needs is generated, not hand-drawn, so an engine bump is a re-run:
+
+```bash
+python scripts/render_listing.py && python scripts/render_video.py
+```
+
+| Slot on the site | File |
+|---|---|
+| Thumbnail, 16:9 | `assets/brand/thumb-wide.png`, 910x512 |
+| Tall, 9:16 | `assets/brand/thumb-tall.png`, 512x910 |
+| Screenshots | `assets/brand/listing/01-problem.png` through `05-install.png`, 1920x1080 |
+| Loading screen | `assets/brand/listing/loading-screen.png` |
+| Video | `assets/brand/listing/video-1-mcp-server.mp4`, `video-2-agent-skill.mp4` |
+
+On the page the two halves are called the **MCP Server** and the **AI Agent Skill**. The word
+*toolset* is this repository's, and it earns its place here because the distinction from the
+editor's own server is real. On a store listing it only invites the question, so the art does
+not use it.
+
 A library consuming this library will not get the editor code either way, per the reference
 loop gate described above.

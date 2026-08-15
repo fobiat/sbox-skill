@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Listing art for the asset.party page**, in `assets/brand/listing/`: five 1920x1080
+  screenshots, a loading screen, and two 1080p30 explainer videos. `assets/brand/thumb-tall.png`
+  joins the wide thumbnail, at 512x910 for the site's 9:16 slot.
+- **`scripts/render_listing.py` and `scripts/render_video.py`**, with the shared palette and
+  mark in `scripts/brand.py`. Every listing image and video is generated from source, so an
+  engine bump is a re-run rather than a session in an image editor. Pillow for the images,
+  `imageio-ffmpeg` for the videos, no system ffmpeg needed.
+
+### Changed
+- **The two halves are named the MCP Server and the AI Agent Skill on the listing.** The word
+  "toolset" stays in this repository, where it draws a real distinction from the editor's own
+  server, and no longer appears on the store page, where it only invited the question. The
+  `.sbproj` title, both thumbnails and all listing art follow the new naming.
+
 ## [0.4.0] - 2026-08-15
 
 A full audit against the decompiled engine and `sbox-public`, then the fixes it found. **Update

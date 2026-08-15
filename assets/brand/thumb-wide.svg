@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 512" width="910" height="512" role="img" aria-label="s&amp;box MCP Server">
-  <title>s&amp;box MCP Server</title>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 910 512" width="910" height="512" role="img" aria-label="s&amp;box MCP Server and AI Agent Skill">
+  <title>s&amp;box MCP Server and AI Agent Skill</title>
   <rect width="910" height="512" fill="#181818"/>
   <rect width="910" height="6" fill="#2BB88E"/>
   <g transform="translate(96,140) scale(3.5)">
@@ -14,8 +14,11 @@
     <path d="M32 47.5 A 8 8 0 1 1 40 39.5" fill="none" stroke="#2BB88E" stroke-width="2.6" stroke-linecap="round"/>
     <circle cx="32" cy="39.5" r="3" fill="#2BB88E"/>
   </g>
-  <text x="376" y="252" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#EEF3F1"><tspan fill="#9E9E9E">s&amp;box</tspan></text>
-  <text x="376" y="322" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="62" font-weight="700" letter-spacing="-1.5" fill="#EEF3F1">MCP Server</text>
-  <text x="378" y="374" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="26" font-weight="500" fill="#2BB88E">fobiat</text>
-  <text x="378" y="424" font-family="JetBrains Mono, Consolas, ui-monospace, monospace" font-size="22" font-weight="500" fill="#9E9E9E">github.com/fobiat/sbox-skill</text>
+  <g font-family="JetBrains Mono, Consolas, ui-monospace, monospace">
+    <text x="376" y="240" font-size="60" font-weight="700" letter-spacing="-1.5" fill="#9E9E9E">s&amp;box</text>
+    <text x="376" y="308" font-size="60" font-weight="700" letter-spacing="-1.5" fill="#EEF3F1">MCP Server</text>
+    <text x="378" y="360" font-size="31" font-weight="700" letter-spacing="-1" fill="#00A8E8">+ AI Agent Skill</text>
+    <text x="378" y="410" font-size="25" font-weight="500" fill="#2BB88E">fobiat</text>
+    <text x="378" y="452" font-size="21" font-weight="500" fill="#9E9E9E">github.com/fobiat/sbox-skill</text>
+  </g>
 </svg>
