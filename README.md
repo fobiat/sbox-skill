@@ -96,7 +96,8 @@ Install this and the second one is what you get.
 
 > Setting up **both halves together**? Follow the
 > **[Quickstart](QUICKSTART.md)** instead, which covers the loop they form and the problems each
-> one fixes for the other.
+> one fixes for the other. The **[in-depth guide](GUIDE.md)** is the long version: every tool,
+> the six ways an edit disappears, and how to write a toolset of your own.
 
 Clone it somewhere your agent can read:
 

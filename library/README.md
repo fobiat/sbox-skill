@@ -61,7 +61,7 @@ its own project root, so this is a copy rather than a link, kept honest by two t
 ## Publishing it
 
 1. Add this directory as a project in the s&box editor. It should appear under Libraries.
-2. Check the toolset still registers: `list_toolsets` should show `sbox_mcp_server` with eleven
+2. Check the toolset still registers: `list_toolsets` should show `sbox_mcp_server` with eighteen
    tools.
 3. Publish from the editor, which uploads to asset.party under `fobiat.sbox_mcp_server`. The
    listing takes its display name from `Title`, so it reads **s&box MCP Server**; the

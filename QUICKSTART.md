@@ -12,7 +12,8 @@ The skill and the toolset solve two halves of the same problem. The skill tells 
 the API is. The toolset lets it check against the engine actually running. Used together they
 close the loop: write, verify, build, read the real error.
 
-You can run either alone. This walks through both.
+You can run either alone. This walks through both. For the long version, every tool explained
+and the reasoning behind each, see the [in-depth guide](GUIDE.md).
 
 <br>
 
