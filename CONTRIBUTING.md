@@ -57,14 +57,14 @@ sentence that does not carry a fact is a sentence that pushed a real one further
    paths you read.
 3. Add a row to the routing table in `SKILL.md`. An unrouted file is an invisible file, and
    CI fails for exactly that reason.
-4. Add its one-line purpose to the `PURPOSE` map in `tools/stamp_headers.py`, then run that
+4. Add its one-line purpose to the `PURPOSE` map in `scripts/stamp_headers.py`, then run that
    script to stamp the header.
 5. Run the gate.
 
 ## The gate
 
 ```bash
-python3 tools/check_skill.py
+python3 scripts/check_skill.py
 ```
 
 It checks that every routing pointer resolves, that no reference file is orphaned, that the

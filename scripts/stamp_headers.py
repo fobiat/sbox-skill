@@ -7,7 +7,7 @@
 #  Licence  : MIT, see LICENSE at the repository root.
 #
 #  Writes the authorship and provenance block at the top of every skill markdown
-#  file, and rewrites it in place on re-run so the stamp never accumulates.
+#  file, replacing any previous block in place so the stamp never accumulates.
 #
 #  In SKILL.md the block goes after the YAML frontmatter, never before it. The
 #  skill loader reads frontmatter only when it opens the file, so anything above

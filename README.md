@@ -26,6 +26,7 @@ Built and maintained by Kyle (fobiat).
 ## Contents
 
 - [What you get](#what-you-get)
+- [Repository layout](#repository-layout)
 - [Install](#install)
 - [Check it loaded](#check-it-loaded)
 - [How to use it](#how-to-use-it)
@@ -62,6 +63,33 @@ It covers the whole surface a game touches, not only the gameplay loop:
 | **Extras** | Node graphs, VR, voice chat |
 | **Lookup** | Full signatures for common types, plus an index of the wider API |
 | **Practice** | Eleven complete worked examples, and a ledger of live-verified behaviour |
+
+---
+
+## Repository layout
+
+Two independent deliverables, plus the tooling that keeps them honest.
+
+```
+sbox-skill/
+├── skills/sbox/            the agent skill, this is what you install
+│   ├── SKILL.md            the router
+│   └── references/         01_SCENE.md through 16_API_INDEX.md
+├── editor-mcp/             the sbox_dev MCP toolset, a drop-in Editor/ file
+│   ├── SboxDevTools.cs
+│   └── README.md
+├── scripts/                repo tooling, not shipped to your game
+│   ├── check_skill.py      the gate
+│   └── stamp_headers.py    header maintenance
+└── .github/workflows/      CI, mirrors the gate
+```
+
+Take either half on its own. The skill works without the MCP toolset, and the toolset is
+useful without the skill.
+
+Everything under `skills/sbox/` is required at runtime. `SKILL.md` is a router that resolves
+to a reference file for every task, so a missing reference is a dead end rather than a
+smaller download, and the gate fails the build if one goes missing.
 
 ---
 
@@ -320,7 +348,7 @@ A confident wrong signature is worse than no signature. An omission makes the mo
 API up. A wrong signature makes it write code that fails later for no visible reason.
 
 ```bash
-python3 tools/check_skill.py
+python3 scripts/check_skill.py
 ```
 
 The gate checks that every routing pointer resolves, that no reference file is unrouted,
