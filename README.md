@@ -8,7 +8,7 @@ enough like Unity that a language model will confidently write `MonoBehaviour`,
 those exist. Every one of them compiles in the model's head and fails in the
 editor. This skill exists to stop that.
 
-Built and maintained by Kyle (fobiat), <https://fobiat.dev>.
+Built and maintained by Kyle (fobiat), <kyle@fobiat.dev>, <https://fobiat.dev/>.
 
 ## What it is
 

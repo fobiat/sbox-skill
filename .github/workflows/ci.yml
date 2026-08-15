@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  check:
+    name: Skill structure
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Check routing table, frontmatter and house style
+        run: python3 tools/check_skill.py
+
+  notify-discord:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    needs: [check]
+    if: always()
+    steps:
+      - name: Post result
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          RESULT: ${{ needs.check.result }}
+        run: |
+          if [ -z "$WEBHOOK" ]; then
+            echo "DISCORD_WEBHOOK_URL not set, skipping"
+            exit 0
+          fi
+
+          if [ "$RESULT" = "success" ]; then
+            COLOR=3066993
+            TITLE="CI passed"
+          else
+            COLOR=15158332
+            TITLE="CI failed"
+          fi
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg repo "$GITHUB_REPOSITORY" \
+            --arg branch "$GITHUB_REF_NAME" \
+            --arg sha "${GITHUB_SHA:0:7}" \
+            --arg url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" \
+            --argjson color "$COLOR" \
+            '{embeds:[{title:$title,color:$color,url:$url,fields:[
+              {name:"Repo",value:$repo,inline:true},
+              {name:"Branch",value:$branch,inline:true},
+              {name:"Commit",value:$sha,inline:true}]}]}')
+
+          curl -sf -H "Content-Type: application/json" -d "$PAYLOAD" "$WEBHOOK" > /dev/null
