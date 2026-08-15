@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : api-core.md
+
+  Full signatures for the types a game touches most.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # API Schema: Core Classes
 
 Full public signatures for the ~50 most-used classes in the s&box engine, extracted from the managed API surface at version 26.08.05. This is a lookup reference, not a tutorial: check it when you need to confirm a method exists, its exact name, its parameter list, or its return type. For usage patterns and worked examples, see the topical reference files instead.
@@ -651,7 +663,7 @@ loading from disk if the client hasn't touched it yet. That is why a `GameResour
 reference is legal inside a `[Sync]` struct or a `NetList<T>` element.
 
 > Authoring a resource asset from outside the editor has its own gotchas (nothing watches
-> your source file). See `editor-and-verified-behaviour.md` → *Authoring a GameResource
+> your source file). See `field-notes.md` → *Authoring a GameResource
 > Asset by Hand*.
 
 ---

@@ -2,7 +2,8 @@
 # =============================================================================
 #  s&box Skill : structure checker
 #
-#  Author   : Kyle (fobiat) <kyle@fobiat.dev>  https://fobiat.dev/
+#  Author   : Kyle (fobiat) <kyle@fobiat.dev>
+#  Links    : https://fobiat.dev/   https://github.com/fobiat
 #  Licence  : MIT, see LICENSE at the repository root.
 #
 #  Validates the skill tree before it ships. Four checks:

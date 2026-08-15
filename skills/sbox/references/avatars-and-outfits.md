@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : avatars-and-outfits.md
+
+  The Citizen avatar: Clothing, ClothingContainer and dressing a SkinnedModelRenderer.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # Avatar and Clothing
 
 Covers the Citizen avatar, the `Clothing` GameResource, `ClothingContainer`, dressing a
@@ -319,7 +331,7 @@ Whichever path builds the clothing GameObjects, remember they're plain, non-netw
 GameObjects created under the body. If you re-dress an already-`NetworkSpawn`ed object
 (changing clothes mid-game, not just at spawn), call `go.Network.Refresh()` on the body's
 GameObject afterwards, structural changes after spawn are not automatically networked (see
-`networking.md`).
+`multiplayer.md`).
 
 ---
 

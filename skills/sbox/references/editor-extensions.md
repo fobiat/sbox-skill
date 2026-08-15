@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : editor-extensions.md
+
+  Authoring editor extensions: EditorTool, custom inspectors, docks and the Widget UI system.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # Editor Tooling
 
 How to author editor extensions: viewport tools, custom inspectors, dockable windows,
@@ -9,7 +21,7 @@ Read out of engine source at version 26.08.05 (`sbox-public`). Primary paths:
 `Asset`, `SelectionSystem`), `engine/Sandbox.Engine/Editor/Gizmos/` (`Gizmo`, in
 namespace `Sandbox`), `engine/Sandbox.System/SerializedObject/CustomEditorAttribute.cs`.
 
-This is a different surface from `references/ui-razor.md`. Razor/`Panel` builds
+This is a different surface from `references/razor-interfaces.md`. Razor/`Panel` builds
 in-game UI rendered by the game's own UI system. Everything in this file is
 **Qt-backed desktop UI** that only exists inside the s&box editor process. A `Panel`
 and a `Widget` share no base class, no layout model, and no styling system. Do not
@@ -649,7 +661,7 @@ guessing an API.
 - **`Widget` and `Panel` do not share a base class.** `Widget.OnPaint()` uses the
   `Paint` static class; `Panel` uses SCSS and the UI render system. Neither API works
   on the other's type. If a task says "editor UI", it means `Widget`/`Layout`; if it
-  says in-game HUD or menu, it means `Panel`/Razor (see `references/ui-razor.md`). If
+  says in-game HUD or menu, it means `Panel`/Razor (see `references/razor-interfaces.md`). If
   in doubt, ask which one is meant: the failure mode, writing Razor markup against a
   `Widget` or vice versa, doesn't compile at all.
 - **`ControlWidget.Create` picks the highest `[CustomEditor]` score, not the first
@@ -664,7 +676,7 @@ guessing an API.
 - **`MeshTrace` on `EditorTool` deliberately disables the physics world**
   (`UsePhysicsWorld(false)`) and enables render-mesh hits. It's for viewport
   picking against what's drawn, not gameplay collision. Don't reach for it inside
-  actual gameplay code; use `Scene.Trace` there (see `references/input-and-physics.md`).
+  actual gameplay code; use `Scene.Trace` there (see `references/input-traces-and-physics.md`).
 - **Undo scopes are manual and paired.** `SceneEditorSession.UndoScope(...).Push()`
   opens a scope; nothing closes it automatically except your own `Dispose()` call on
   mouse-release. Every stock component tool (`BoxColliderTool`, `CapsuleColliderTool`)

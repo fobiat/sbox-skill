@@ -26,7 +26,7 @@ a named version. Cite the repo-relative path.
 **Live-verified** tells you what the API does. It comes from running the thing and
 watching what happened. Cite the date.
 
-Where the two disagree, the ledger in `references/editor-and-verified-behaviour.md`
+Where the two disagree, the ledger in `references/field-notes.md`
 wins, and the disagreement itself is worth recording. Most of the traps in this
 skill are cases where a correct-looking call silently does nothing.
 

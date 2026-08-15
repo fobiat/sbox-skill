@@ -1,9 +1,21 @@
+<!--
+  s&box Skill : api-index.md
+
+  Namespace-organised index of the wider API surface.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # API Schema: Extended Reference
 
 A namespace-organized index of public s\&box types, extracted from the engine's managed API surface at version 26.08.05. It covers everything not already listed in one of these:
-- `api-schema-core.md`: full signatures for the ~50 most-used classes
-- `components-builtin.md`: all 144 built-in Component-derived types
-- `ui-razor.md`, `networking.md`, `input-and-physics.md`: these three include their API inline rather than deferring here
+- `api-core.md`: full signatures for the ~50 most-used classes
+- `component-library.md`: all 144 built-in Component-derived types
+- `razor-interfaces.md`, `multiplayer.md`, `input-traces-and-physics.md`: these three include their API inline rather than deferring here
 
 Use this file for discovery: to answer "does this exist?" and "what does it do?". Each entry follows the format `MethodName( args ) → ReturnType` or `PropertyName : Type`.
 
@@ -86,7 +98,7 @@ Marks a `GameResource` subclass as storable as an asset on disk. **Use this, not
 obsolete `[GameResource(...)]`.** Set via property initializers, not ctor args:
 `[AssetType( Name = "Item", Extension = "item", Category = "Game" )]`
 - `Name : string`, `Extension : string`, `Category : string` (default `"Other"`), `Flags : AssetTypeFlags`, `IconColor : string`, `static FindTypeByExtension( string extension ) → TypeDescription`
-- Full usage, on-disk JSON format and loading: `api-schema-core.md` → *GameResource & `[AssetType]`*
+- Full usage, on-disk JSON format and loading: `api-core.md` → *GameResource & `[AssetType]`*
 
 ### AssetTypeFlags (enum)
 Flags for `AssetTypeAttribute`
@@ -286,7 +298,7 @@ Values: None, A, B, X, Y, SwitchLeftMenu, Guide, SwitchRightMenu, LeftJoystickBu
 
 ### GameResource (class)
 Assets defined in C# and created through tools. Derive from this and mark the class with
-`[AssetType]`; see `api-schema-core.md` → *GameResource & `[AssetType]`*
+`[AssetType]`; see `api-core.md` → *GameResource & `[AssetType]`*
 - `HasUnsavedChanges : bool`, `ResourceVersion : int`, `IsValid : bool`, `StateHasChanged(  ) → void`, `GetReferencedPackages(  ) → IEnumerable<string>`
 - From `Resource`: `ResourcePath : string` (persist this), `ResourceName : string`, `ResourceId : int` (**obsolete**)
 
@@ -574,7 +586,7 @@ A networkable list for use with the `SyncAttribute` and `HostSyncAttribute`. Sen
 not the whole list
 - `Clear(  ) → void`, `RemoveAt( int index ) → void`, `Dispose(  ) → void`, `Contains( T item ) → bool`, `Count : int`
 - `OnChanged : Action<NetListChangeEvent<T>>` is a **public field**, not an event. Subscribe with `+=`. `[Change]` does not work on a `NetList` property (it wraps the property setter, so it only fires on reassignment)
-- Mutations are silently no-ops on a non-controller. Initialize once with `= new()` and never reassign after spawn. See `networking.md` → *Networked Collections*
+- Mutations are silently no-ops on a non-controller. Initialize once with `= new()` and never reassign after spawn. See `multiplayer.md` → *Networked Collections*
 
 ### NetListChangeEvent<T> (struct)
 Describes a change to a `NetListChangeEvent`1` which is passed to `OnChanged` whenever its contents change
@@ -1441,7 +1453,7 @@ A component that can be pressed: the "walk up and press E" interface. Nested on
 - `Press( Component.IPressable.Event e ) → bool` (**the only required member**), `CanPress( e ) → bool`, `Pressing( e ) → bool`, `Release( e ) → void`, `Hover( e ) → void`, `Look( e ) → void`, `Blur( e ) → void`, `GetTooltip( e ) → Component.IPressable.Tooltip?`
 - `Event` : `record struct ( Component Source, Ray? Ray = default )`. `Source` is the pressing `PlayerController`
 - `Tooltip` : `record struct ( string Title, string Icon, string Description, bool Enabled = true, IPressable Pressable = default )`
-- **`Press` runs on the pressing client, not the host.** See `core-concepts.md` → *IPressable*
+- **`Press` runs on the pressing client, not the host.** See `scene-and-components.md` → *IPressable*
 
 ### ISceneEditorSession (interface)
 - `Scene : Scene`, `HasUnsavedChanges : bool`, `Selection : SelectionSystem`, `AddSelectionUndo(  ) → void`, `GetSelection(  ) → IEnumerable<object>`

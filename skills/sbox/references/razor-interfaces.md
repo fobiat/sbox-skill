@@ -1,20 +1,32 @@
+<!--
+  s&box Skill : razor-interfaces.md
+
+  Razor UI: panels, SCSS, the flexbox layout model, built-in controls and world-space panels.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # UI & Razor Panels
 
-Razor panels, SCSS styling, Panel lifecycle, data binding, events, built-in controls, and navigation. Everything here was read out of the engine source at version **26.08.05** (`sbox-public`).
+How Panels are built and styled: Razor markup, SCSS, lifecycle, data binding, event wiring, the stock control library, and page navigation. Pulled straight from the engine source at version **26.08.05** (`sbox-public`), not from memory or the web docs.
 
 ---
 
 ## Architecture
 
-s&box UI is a **Panel** tree laid out with CSS flexbox. You can build panels in pure C# or in Razor (HTML/CSS plus C#); Razor is a convenience layer over the same tree, and it renders identically to hand-written C# panels either way.
+Everything on screen sits in a **Panel** tree, laid out with CSS flexbox underneath. You have two ways to build that tree: write it by hand in C#, or describe it in Razor, which mixes HTML/CSS with C#. Neither is more "real" than the other; Razor compiles down to the same Panel objects, so a hand-built C# panel and a Razor one behave identically at runtime.
 
 **Hierarchy:** `ScreenPanel` or `WorldPanel` component (on a GameObject) → `PanelComponent` (root) → child `Panel`s
 
-- `PanelComponent` extends `Component`. It's a scene component, not a Panel.
-- `Panel` is the actual UI base class. Every UI element inherits from it.
-- `PanelComponent.Panel` gives you the root `Panel`, so you have something to parent children to.
+- `PanelComponent` is a `Component` subclass and lives on a GameObject like any other component. It is not itself a Panel.
+- `Panel`, by contrast, is what every actual UI element derives from.
+- Reach the root Panel through `PanelComponent.Panel` when you need somewhere to attach children.
 
-**The distinction that trips people up:** you cannot nest a `PanelComponent` inside another panel with `<MyPanelComponent />`. A PanelComponent has to live on a GameObject carrying a ScreenPanel or WorldPanel. Only `Panel` subclasses can be nested inside Razor markup.
+**Where people get tripped up:** `<MyPanelComponent />` inside another panel's markup does not work. A `PanelComponent` needs a GameObject with a ScreenPanel or WorldPanel underneath it; it cannot be embedded as a child element. Nesting inside Razor markup is reserved for plain `Panel` subclasses.
 
 ---
 
@@ -73,22 +85,22 @@ HealthBar.razor.scss
 
 ### Key Rules
 
-A few things that don't show up until you hit them:
+The handful of behaviors that aren't obvious until they bite you:
 
-- `<root>` wraps all your HTML. Leave it out and s&box parents elements to the panel root automatically.
-- `@code { }` holds the C#: properties, methods, overrides.
-- The `@` prefix injects a C# expression into HTML: `@MyVar`, `@(expression)`, `@foreach`, `@if`.
-- A `return;` inside the Razor body stops rendering beyond that point.
+- Everything you write in the markup gets wrapped in `<root>` implicitly if you leave it out; the tag exists so you can be explicit about it, not because it's mandatory.
+- `@code { }` is where the C# lives: fields, properties, method bodies, overrides.
+- `@` is the escape hatch into C# from inside HTML, whether that's a bare variable (`@MyVar`), a parenthesized expression (`@(expression)`), or a control-flow block (`@foreach`, `@if`).
+- Hit a `return;` partway through the Razor body and everything after it simply doesn't render.
 
 ### BuildHash
 
-Razor panels don't re-render every frame. Whatever `BuildHash()` returns gets compared against last frame's value, and the template body only re-executes when it changes. That's why every piece of data the template reads has to go into the hash: leave one out, and the panel keeps showing a stale value for that field even while everything else updates around it.
+The template body is not re-run every frame. Instead, `BuildHash()` produces a value each frame, that value is diffed against last frame's, and the body only re-executes on a change. The consequence: any field the template reads must feed into the hash, or the panel silently freezes on that field's old value while everything else keeps updating.
 
 ```csharp
 protected override int BuildHash() => System.HashCode.Combine( Health, Armor, IsAlive );
 ```
 
-Hover and click also force a rebuild, since those flip pseudo-class state the CSS may depend on. Call `StateHasChanged()` to force one yourself.
+There are two rebuild triggers outside of `BuildHash()` changing: hover and click, because those toggle pseudo-classes the stylesheet might key off of. Anything else that should force a rebuild needs an explicit `StateHasChanged()` call.
 
 ### Passing Properties
 
@@ -107,7 +119,7 @@ Hover and click also force a rebuild, since those flip pseudo-class state the CS
 
 ### Two-Way Binding
 
-`:bind` keeps a property and a control's value in sync in both directions, so you don't have to wire a change handler by hand:
+`:bind` links a property to a control's value in both directions at once, which removes the need to write a change handler yourself:
 
 ```razor
 <SliderControl Min=@(0) Max=@(100) Step=@(1) Value:bind=@Volume />
@@ -120,7 +132,7 @@ Hover and click also force a rebuild, since those flip pseudo-class state the CS
 
 ### RenderFragment (Reusable Components)
 
-A `RenderFragment` property is a slot: the caller supplies markup, the component decides where it lands.
+Think of a `RenderFragment` property as a named hole in the component: the parent fills it with markup, and the component itself decides where that markup gets placed.
 
 ```razor
 <!-- InfoCard.razor -->
@@ -144,7 +156,7 @@ Usage:
 </InfoCard>
 ```
 
-Every panel gets a built-in `ChildContent` fragment for free, so a component that only needs one slot doesn't need to declare one:
+You get a `ChildContent` fragment on every panel automatically, without declaring it, which covers the common case of a component that only wants a single slot:
 ```razor
 <InfoCard>
     <ChildContent>
@@ -155,7 +167,7 @@ Every panel gets a built-in `ChildContent` fragment for free, so a component tha
 
 ### RenderFragment\<T\> (Templated Components)
 
-The typed version passes a value into the slot's markup, which is what makes list rows and item templates work:
+Add a type parameter and the fragment can hand a value down into whatever markup it renders, which is exactly the mechanism behind list rows and per-item templates.
 
 ```razor
 <!-- PlayerList.razor -->
@@ -216,15 +228,15 @@ Usage in Razor: `<MyPanel T="string" Value=@("hello") />`
 
 ### SCSS Stylesheets
 
-A stylesheet loads automatically by naming convention: `MyPanel.razor` picks up `MyPanel.razor.scss` with no wiring required.
+Naming does the wiring for you: a panel called `MyPanel.razor` picks up `MyPanel.razor.scss` with zero configuration.
 
-Or load one explicitly:
+Explicit loading works too, when the naming convention doesn't fit:
 ```csharp
 [StyleSheet( "path/to/style.scss" )]
 public class MyPanel : Panel { }
 ```
 
-Import other stylesheets the normal SCSS way:
+Pulling in other stylesheets follows ordinary SCSS syntax:
 ```scss
 @import "shared/buttons.scss";
 ```
@@ -255,7 +267,7 @@ Import other stylesheets the normal SCSS way:
 myPanel.Style.Width = Length.Percent( progress * 100f );
 myPanel.Style.BackgroundColor = Color.Red;
 myPanel.Style.Opacity = 0.5f;
-myPanel.Style.Dirty();  // flags the style as changed, forcing a re-layout
+myPanel.Style.Dirty();  // marks the style dirty, which schedules a re-layout
 ```
 
 ### CSS Classes (C# API)
@@ -274,7 +286,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ## Layout System
 
-**Everything is flexbox.** `display: flex` is the default, and the only display mode besides `none`. There's no grid, no inline, no block, so any CSS knowledge that assumes those modes doesn't transfer.
+**Flexbox is not one option among several here, it's the whole model.** `display: flex` is both the default and the only alternative to `none`, full stop. Grid, inline flow, block flow: none of that exists, so instincts built on those modes will lead you wrong.
 
 ### Key Layout Properties
 
@@ -294,7 +306,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ### Length Units
 
-`Length` is the C# type behind every dimension in the style system, whether you set it from SCSS or from code.
+Every dimension in the style system, no matter whether it's set from SCSS or from code, ultimately boils down to the C# type `Length`.
 
 | Unit | SCSS | C# |
 |------|------|----|
@@ -314,7 +326,7 @@ panel.FlashClass( "hit", 0.5f );          // add, then remove after duration
 
 ### CSS Transitions
 
-Standard CSS transitions work as expected:
+Nothing unusual here; browser-standard CSS transitions behave the way you'd expect:
 
 ```scss
 .button {
@@ -331,7 +343,7 @@ Standard CSS transitions work as expected:
 
 ### Intro/Outro (s&box specific)
 
-Web CSS has no equivalent to these two: `:intro` is active for one frame when the element is first created, so whatever properties you set under it become the state the element transitions FROM. `:outro` gets added the moment `Panel.Delete()` is called, and the panel actually waits for its transitions to finish playing before it's removed for real, which is what makes fade-out and slide-out effects on deletion possible at all.
+These two pseudo-classes don't have a web CSS counterpart. `:intro` applies for exactly one frame at creation time, and whatever you declare under it becomes the FROM state of the transition, everything animates away from those values. `:outro` applies the instant `Panel.Delete()` runs, but deletion itself doesn't happen immediately: the panel holds off on actually being removed until its outro transitions finish playing, which is the whole mechanism that makes fade-outs and slide-outs on delete possible.
 
 ```scss
 .notification {
@@ -369,7 +381,7 @@ Web CSS has no equivalent to these two: `:intro` is active for one frame when th
 
 ### Sound on State Change
 
-`sound-in` and `sound-out` fire off a sound the instant a pseudo-class is applied or removed, no C# event handler needed:
+`sound-in` and `sound-out` trigger audio directly from a pseudo-class transition, no C# listener required:
 
 ```scss
 .button {
@@ -386,7 +398,7 @@ Web CSS has no equivalent to these two: `:intro` is active for one frame when th
 
 ## Panel API
 
-`Sandbox.UI.Panel` is the base for all UI elements.
+Every UI element ultimately derives from `Sandbox.UI.Panel`.
 
 ### Tree / Hierarchy
 
@@ -437,7 +449,7 @@ panel.PreferScrollToBottom      // auto-scroll to bottom (chat logs)
 
 ### Events
 
-Panels can listen for events three ways: the attribute, a direct listener, or a Razor attribute.
+There are three separate ways to wire up a listener: an attribute on the handler method, a direct call to add one, or an inline Razor attribute.
 
 ```csharp
 // Event listener via attribute
@@ -461,7 +473,7 @@ panel.PanelPositionToScreenPosition( panelPos )     // → Vector2
 
 ### Builder Pattern
 
-Useful for building panels from pure C# without a `.razor` file:
+Handy when a panel is being assembled entirely from C#, with no `.razor` file backing it:
 
 ```csharp
 var row = panel.Add.Panel( "row" );
@@ -576,7 +588,7 @@ Selection from options list.
 </DropDown>
 ```
 
-Or build options in code:
+Building the option list from code works as well:
 ```csharp
 dropdown.Options = new List<Option>
 {
@@ -621,7 +633,7 @@ Toggle switch.
 
 ## VirtualGrid
 
-Rendering thousands of item panels the normal way means thousands of live Panel objects, most of them off-screen. `VirtualGrid` only creates panels for items actually in view, and recycles them as you scroll.
+Naively rendering a few thousand items would mean a few thousand live Panel objects sitting in memory, the overwhelming majority off-screen at any given moment. `VirtualGrid` sidesteps that: it only instantiates panels for what's actually visible, recycling them as the list scrolls.
 
 ```razor
 <VirtualGrid Items=@AllItems ItemSize=@(new Vector2(120, 120))>
@@ -634,16 +646,16 @@ Rendering thousands of item panels the normal way means thousands of live Panel 
 </VirtualGrid>
 ```
 
-- `Items` accepts any `IEnumerable<T>`.
-- `ItemSize` is a `Vector2`: cells scale to fill the available width, preserving aspect ratio.
-- The grid needs an explicit size in CSS (`width: 100%; height: 100%`), since it can't infer one from virtualized content.
-- Use the `gap` CSS property for spacing between cells.
+- `Items` takes anything that implements `IEnumerable<T>`.
+- `ItemSize`, a `Vector2`, sets the cell dimensions; cells scale to fill the available width while keeping their aspect ratio.
+- CSS needs to give the grid an explicit size (`width: 100%; height: 100%`), because virtualized content gives it nothing to infer a size from.
+- Spacing between cells comes from the `gap` CSS property, same as anywhere else.
 
 ---
 
 ## Navigation
 
-`NavigationHost` (in `Sandbox.UI.Navigation`) behaves like a single-page website: one panel visible at a time, with back/forward history tracked for you.
+`NavigationHost`, found in `Sandbox.UI.Navigation`, works like a single-page app: exactly one panel is shown at a time, and back/forward history is tracked automatically.
 
 ```razor
 @using Sandbox.UI.Navigation
@@ -658,7 +670,7 @@ Rendering thousands of item panels the normal way means thousands of live Panel 
 </root>
 ```
 
-Register pages up front, then navigate:
+Pages need to be registered before you can navigate to them:
 ```csharp
 protected override void OnStart()
 {
@@ -676,9 +688,9 @@ protected override void OnStart()
 | `CurrentUrl` | Current page URL |
 | `CurrentPanel` | Current page Panel |
 
-Pages can implement `INavigatorPage` for `OnNavigationOpen()` / `OnNavigationClose()` callbacks.
+A page can implement `INavigatorPage` to get `OnNavigationOpen()` and `OnNavigationClose()` callbacks.
 
-`NavLinkPanel` auto-applies the `.active` class when its `Href` matches the current URL, so a nav bar's highlight state needs no extra code.
+`NavLinkPanel` compares its own `Href` to the active URL and adds `.active` when they match, so highlighting the current nav item takes no extra code on your end.
 
 ---
 
@@ -706,7 +718,7 @@ Pages can implement `INavigatorPage` for `OnNavigationOpen()` / `OnNavigationClo
 
 ## Localization
 
-Any string prefixed with `#` is treated as a localization token and resolved automatically, in markup or in a control property:
+Prefix a string with `#` anywhere, whether that's raw markup or a control property, and it gets resolved as a localization token automatically:
 
 ```razor
 <label>#menu.play</label>
@@ -721,7 +733,7 @@ Token file: `Localization/en/mygame.json`
 }
 ```
 
-31 languages are supported. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-cn`, `zh-tw`, `ru`, `pt-br`, etc.
+There's coverage for 31 languages out of the box. Language codes: `en`, `fr`, `de`, `es`, `ja`, `ko`, `zh-cn`, `zh-tw`, `ru`, `pt-br`, etc.
 
 ---
 
@@ -729,7 +741,7 @@ Token file: `Localization/en/mygame.json`
 
 ### Differences from Web CSS
 
-If you're coming from browser CSS, these are the places s&box's style engine diverges:
+Coming in with browser CSS habits, watch for these spots where s&box's style engine parts ways with the standard:
 
 | Property | s&box Behavior |
 |----------|---------------|
@@ -742,7 +754,7 @@ If you're coming from browser CSS, these are the places s&box's style engine div
 | `background-image-tint` | Custom. Multiplies background image by color. |
 | `content` | Sets `Label.Text` directly. |
 
-Note `pointer-events` in particular: a panel that looks clickable but silently eats no input is almost always missing `pointer-events: all` somewhere in its ancestor chain, since the default is `none`.
+The `pointer-events` default deserves its own callout: if a panel looks perfectly clickable but simply swallows nothing, the near-universal cause is that `pointer-events: all` is missing somewhere up its ancestor chain, since the engine defaults to `none`.
 
 ### Common Patterns
 
@@ -780,7 +792,7 @@ Note `pointer-events` in particular: a panel that looks clickable but silently e
 
 ## Complete Working Example
 
-A HUD with health bar and kill feed, showing a PanelComponent, its stylesheet, and `:intro`/`:outro` together:
+A health-bar-and-kill-feed HUD, put together to show a PanelComponent, its paired stylesheet, and `:intro`/`:outro` all working together in one place:
 
 **MyHud.razor:**
 ```razor

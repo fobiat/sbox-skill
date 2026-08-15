@@ -1,72 +1,302 @@
 # s&box Skill
 
-An agent skill that teaches Claude to write correct [s&box](https://sbox.game) C#.
+**An agent skill that teaches Claude to write s&box C# that actually compiles.**
 
-s&box is Facepunch's Source 2 game engine with a C# scripting layer. It looks
-enough like Unity that a language model will confidently write `MonoBehaviour`,
-`Start()`, `transform.position` and `Physics.Raycast` into a file where none of
-those exist. Every one of them compiles in the model's head and fails in the
-editor. This skill exists to stop that.
+[![Engine](https://img.shields.io/badge/s%26box-26.08.05-f59c1a)](https://sbox.game)
+[![Licence](https://img.shields.io/badge/licence-MIT-3fb950)](LICENSE)
+[![Reference files](https://img.shields.io/badge/reference%20files-16-4c8eda)](skills/sbox/references)
 
-Built and maintained by Kyle (fobiat), <kyle@fobiat.dev>, <https://fobiat.dev/>.
+s&box is Facepunch's Source 2 engine with a C# scripting layer. It borrows `GameObject`
+and `Component` from Unity and then diverges almost everywhere else: a different lifecycle,
+a different networking model, Z-up instead of Y-up, a restricted .NET surface, and Razor
+for UI.
 
-## What it is
+That surface similarity is the whole problem. Ask any model for an s&box component and it
+hands you `MonoBehaviour`, `void Update()`, `transform.position`, `Physics.Raycast` and
+`Debug.Log`. Every one of those reads correctly. Not one of them exists. You find out in
+the editor, later, with no useful error.
 
-Ten reference files and a router. `SKILL.md` deliberately contains almost no
-answers: it identifies which reference file holds the answer and sends the model
-there. That shape is the point. A single flat document gets skimmed, and a
-skimmed API reference is how hallucinations get through.
+This skill exists to stop that.
 
-| File | Covers |
+Built and maintained by Kyle (fobiat).
+[fobiat.dev](https://fobiat.dev/) &middot; [github.com/fobiat](https://github.com/fobiat) &middot; kyle@fobiat.dev
+
+---
+
+## Contents
+
+- [What you get](#what-you-get)
+- [Install](#install)
+- [Check it loaded](#check-it-loaded)
+- [How to use it](#how-to-use-it)
+- [How it works](#how-it-works)
+- [The reference library](#the-reference-library)
+- [Field notes: the part you cannot get from docs](#field-notes-the-part-you-cannot-get-from-docs)
+- [Engine version and drift](#engine-version-and-drift)
+- [Contributing](#contributing)
+- [Licence](#licence)
+
+---
+
+## What you get
+
+Sixteen reference files and a router, roughly 15,000 lines, every factual claim traceable
+to engine source at a named version.
+
+It covers the whole surface a game touches, not only the gameplay loop:
+
+|  | Area |
 |---|---|
-| `references/core-concepts.md` | Scene, GameObject, Component, lifecycle, prefabs, scene events |
-| `references/components-builtin.md` | Rendering, physics, character controller, camera, lighting, audio, navigation |
-| `references/ui-razor.md` | Razor panels, SCSS, flexbox, built-in controls, world panels |
-| `references/networking.md` | Lobbies, ownership, `[Sync]`, RPCs, network events, dedicated servers |
-| `references/input-and-physics.md` | Input actions, `Scene.Trace`, physics world, math types, time, gizmos |
-| `references/editor-tooling.md` | Editor extensions: `EditorTool`, custom inspectors, docks, the Widget UI system |
-| `references/services-and-persistence.md` | Stats, leaderboards, save data, packages, mounting |
-| `references/avatar-and-clothing.md` | Citizen avatar, `Clothing`, `ClothingContainer`, dressing a renderer |
-| `references/shaders-and-rendering.md` | `.shader` authoring, materials, render attributes, render layers |
-| `references/audio-and-localization.md` | Mixer graph, sound handles, `Phrase`, language files |
-| `references/api-schema-core.md` | Full signatures for the most-used types |
-| `references/api-schema-extended.md` | Namespace-organised index of the wider API surface |
-| `references/patterns-and-examples.md` | Complete worked examples: FPS controller, networked player, HUD, weapon, AI |
-| `references/editor-and-verified-behaviour.md` | Editor MCP server, and behaviour confirmed in live sessions |
+| **Core** | Scene and component model, lifecycle, prefabs, scene events |
+| **Content** | The built-in component library: rendering, physics, movement, camera, lighting, navigation |
+| **Interface** | Razor panels, SCSS, flexbox, built-in controls, world-space panels |
+| **Multiplayer** | Lobbies, ownership, `[Sync]`, RPCs, network events, dedicated servers |
+| **Simulation** | Input actions, traces, physics world, math types, time, gizmos |
+| **Editor** | `EditorTool`, custom inspectors, docks, and the Qt-backed Widget system |
+| **Backend** | Stats, leaderboards, achievements, save data, packages, mounting |
+| **Avatars** | Citizen model, `Clothing`, `ClothingContainer`, dressing a renderer |
+| **Rendering** | `.shader` authoring, materials, render attributes, command lists, layers |
+| **Audio** | The mixer graph, sound handles, processors, and localization |
+| **Extras** | Node graphs, VR, voice chat |
+| **Lookup** | Full signatures for common types, plus an index of the wider API |
+| **Practice** | Eleven complete worked examples, and a ledger of live-verified behaviour |
 
-## Why the verification ledger matters
-
-Most of this skill records what the API **is**, read out of engine source. One
-file records what it was observed to **do**, in a live editor session, with dates.
-
-Those are not the same thing, and the gap between them is where the expensive
-bugs live. A `[Sync]` write you are not allowed to make is dropped before it
-reaches the backing field: no exception, no warning, and the immediate read-back
-already shows the authoritative value. The schema says the property exists and is
-settable. The schema is not wrong. It is just not the whole story.
-
-Where a source-read fact and a live-verified fact disagree, the ledger wins.
+---
 
 ## Install
 
-Copy `skills/sbox/` into your project:
+The skill is the `skills/sbox/` directory. Put it wherever your agent reads skills from.
+
+### Per project
+
+Scopes the skill to one game, which is usually what you want.
+
+```bash
+git clone https://github.com/fobiat/sbox-skill.git /tmp/sbox-skill
+mkdir -p your-game/.claude/skills
+cp -r /tmp/sbox-skill/skills/sbox your-game/.claude/skills/
+```
+
+### Everywhere
+
+Available in every project you open.
+
+```bash
+git clone https://github.com/fobiat/sbox-skill.git /tmp/sbox-skill
+mkdir -p ~/.claude/skills
+cp -r /tmp/sbox-skill/skills/sbox ~/.claude/skills/
+```
+
+### As a submodule
+
+Best if you want `git pull` to bring engine updates with it.
+
+```bash
+git submodule add https://github.com/fobiat/sbox-skill.git .claude/skills/sbox-skill
+ln -s sbox-skill/skills/sbox .claude/skills/sbox
+```
+
+Any of these ends up looking like this:
 
 ```
-your-project/.claude/skills/sbox/
+your-game/
+├── Code/
+├── your-game.sbproj
+└── .claude/
+    └── skills/
+        └── sbox/
+            ├── SKILL.md
+            └── references/
+                ├── scene-and-components.md
+                └── ...
 ```
 
-Or into `~/.claude/skills/sbox/` to make it available everywhere.
+---
 
-## Engine version
+## Check it loaded
 
-Written against engine version **26.08.05**. The API surface moves. Every
-reference file names the version and the upstream paths it was read from, so a
-future regeneration can diff against a newer engine rather than starting over.
+Ask for something that should trip a Unity reflex:
+
+> Write me an s&box component that moves a cube forward at 200 units per second.
+
+**Loaded.** You get `public sealed class ... : Component`, a
+`protected override void OnUpdate()`, and movement along `Vector3.Forward`, which is
+`(1,0,0)` because s&box is Z-up.
+
+**Not loaded.** You get `MonoBehaviour`, `void Update()`, `transform.Translate`, or
+`Vector3.forward`. Check the directory is named exactly `sbox` and that `SKILL.md` sits at
+its root with its frontmatter intact.
+
+---
+
+## How to use it
+
+Once installed it triggers on its own. The description matches mentions of s&box, `.sbproj`
+files, `using Sandbox;`, `PanelComponent`, `[Sync]`, `Scene.Trace` and the rest, so you do
+not need to invoke it by name.
+
+What changes the result is how you ask.
+
+### Name the subsystem
+
+The skill routes by task, so saying which part of the engine you are in opens the right
+reference first.
+
+> Add a **networked** health component. Only the host may change health, and clients get a
+> change callback for the HUD.
+
+> Build a **Razor** inventory panel with a scrolling grid, and make it rebuild only when
+> the item list changes.
+
+> Write an **editor tool** that snaps the selected GameObject to the surface under the cursor.
+
+### Ask for the trap, not just the code
+
+The most valuable content here is the set of calls that look correct and silently do
+nothing. Asking directly surfaces them.
+
+> I am about to spawn this prefab from the host and expect clients to see its `[Sync]`
+> values. What will bite me?
+
+You should hear that `NetworkSpawn()` with no arguments assigns ownership to whoever called
+it, and that `NetworkMode.Snapshot` is the default for scene objects and does not
+live-replicate `[Sync]` even though RPCs keep working perfectly.
+
+### Ask it to verify before it writes
+
+> Before you write this, confirm every API you plan to use exists in the reference files,
+> and list anything you could not find.
+
+The skill's own rule is that a member missing from all three lookup files does not exist.
+This turns that rule into an explicit step you can read.
+
+### Porting from Unity
+
+> Port this Unity script to s&box. Flag every construct with no equivalent instead of
+> inventing one.
+
+`SKILL.md` carries a Unity to s&box translation table covering roughly fifty constructs,
+including the ones with no direct equivalent, such as coroutines.
+
+---
+
+## How it works
+
+`SKILL.md` is a **router**, not a manual. It answers almost nothing itself. It works out
+which reference file holds the answer and sends the model there.
+
+```
+                    ┌──────────────┐
+   "write a HUD" ──▶│   SKILL.md   │  routes by task
+                    └──────┬───────┘
+                           │
+     ┌─────────────────────┼──────────────────────┐
+     ▼                     ▼                      ▼
+razor-interfaces      multiplayer.md          api-core.md
+   panels, SCSS       ownership, [Sync]     full signatures
+   BuildHash          RPCs, lobbies         for common types
+```
+
+The shape is deliberate. A single flat document gets skimmed, and a skimmed API reference is
+exactly how a hallucination gets through. Forcing a second read of a topical file puts real
+signatures in front of the model before it writes any.
+
+Three rules hold the design together:
+
+1. **The router never answers.** Let it start holding answers and it stops being read as an
+   index, and the reference files go unopened.
+2. **A missing API is not an API.** If a member appears in none of the lookup files, the
+   correct move is to stop, not to guess.
+3. **Existence is not behaviour.** A signature proves a call compiles. It proves nothing
+   about whether the call does anything.
+
+That third rule is what the field notes exist for.
+
+---
+
+## The reference library
+
+| File | What it covers |
+|---|---|
+| [`scene-and-components.md`](skills/sbox/references/scene-and-components.md) | Scene, GameObject, Component, lifecycle, prefabs, scene events, `IPressable` |
+| [`component-library.md`](skills/sbox/references/component-library.md) | Rendering, physics, `CharacterController`, `PlayerController`, `Prop`, inventory, camera, lighting, audio, navigation, effects |
+| [`razor-interfaces.md`](skills/sbox/references/razor-interfaces.md) | `.razor` panels, `PanelComponent`, `BuildHash`, SCSS, flexbox, transitions, built-in controls, world panels |
+| [`multiplayer.md`](skills/sbox/references/multiplayer.md) | Lobbies, connections, ownership, `[Sync]`, `NetList`, RPCs, network events, dedicated servers |
+| [`input-traces-and-physics.md`](skills/sbox/references/input-traces-and-physics.md) | Input actions, `Scene.Trace`, physics world, collision listeners, math types, time, gizmos |
+| [`editor-extensions.md`](skills/sbox/references/editor-extensions.md) | `EditorTool`, `[CustomEditor]`, docks, the Widget and Layout system, editor asset access |
+| [`backend-and-saved-data.md`](skills/sbox/references/backend-and-saved-data.md) | Stats, leaderboards, achievements, `FileSystem.Data`, cookies, `Package`, mounting |
+| [`avatars-and-outfits.md`](skills/sbox/references/avatars-and-outfits.md) | Citizen model paths, `Clothing`, `ClothingContainer`, `Dresser`, body and material groups |
+| [`shading-and-render-path.md`](skills/sbox/references/shading-and-render-path.md) | `.shader` anatomy, HLSL entry points, `Material`, `RenderAttributes`, `CommandList`, render layers |
+| [`sound-and-language.md`](skills/sbox/references/sound-and-language.md) | Mixer graph, `SoundHandle`, audio processors, `Phrase`, language files, `#` tokens |
+| [`node-graphs.md`](skills/sbox/references/node-graphs.md) | Exposing C# as graph nodes, graph-backed callbacks a designer can wire |
+| [`vr-and-voice-chat.md`](skills/sbox/references/vr-and-voice-chat.md) | VR rig, controllers, haptics, voice capture, transmission, playback |
+| [`worked-examples.md`](skills/sbox/references/worked-examples.md) | Eleven complete components, from an FPS controller to a press-E vendor |
+| [`field-notes.md`](skills/sbox/references/field-notes.md) | The editor MCP server, and behaviour confirmed in live sessions |
+| [`api-core.md`](skills/sbox/references/api-core.md) | Full signatures for the types a game touches most |
+| [`api-index.md`](skills/sbox/references/api-index.md) | Namespace-organised index of the wider API surface |
+
+---
+
+## Field notes: the part you cannot get from docs
+
+Most of this skill records what the API **is**, read out of engine source. One file records
+what it was observed to **do**, in a live editor session, with dates.
+
+Those are different claims, and the gap between them is where the expensive bugs live.
+
+Take `[Sync]`. A write you are not permitted to make gets discarded before it reaches the
+backing field. No exception, no warning, and the read-back on the very next line already
+shows the authoritative value, so the code looks like it worked. The schema says the
+property exists and is settable. The schema is not wrong. It is just not the whole story.
+
+Where a source-read fact and a live-verified one disagree, **the field note wins**, and the
+disagreement is itself worth writing down.
+
+---
+
+## Engine version and drift
+
+Written against engine **26.08.05**. Every reference file names the version and the upstream
+paths it was read from, so the next regeneration can diff against a newer engine instead of
+starting from nothing.
+
+The API moves, and stale guidance is worse than none. One case already caught: the trace tag
+filters were once documented as taking `string[]` rather than `params`. In 26.08.05 they are
+`params string[]`, verified at `engine/Sandbox.Engine/Scene/Scene/Scene.Trace.cs:637`, so
+the old advice now produces awkward code and a confused reader.
+
+Found something that has drifted? The
+[wrong-API issue template](.github/ISSUE_TEMPLATE/wrong-api.yml) asks for the one thing that
+matters: where you confirmed the truth.
+
+---
+
+## Contributing
+
+One rule outranks the rest: **never write an API you have not verified.**
+
+A confident wrong signature is worse than no signature. An omission makes the model look the
+API up. A wrong signature makes it write code that fails later for no visible reason.
+
+```bash
+python3 tools/check_skill.py
+```
+
+The gate checks that every routing pointer resolves, that no reference file is unrouted,
+that frontmatter is intact, and that no em dash appears anywhere. Green does not mean an API
+is correct. Only reading the source does that.
+
+Full guidance in [CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
 
 ## Licence
 
-MIT, see [LICENSE](LICENSE). The described API surface derives from Facepunch's
-MIT-licensed [sbox-public](https://github.com/Facepunch/sbox-public); that
-copyright notice travels in `LICENSE` as MIT requires.
+MIT, see [LICENSE](LICENSE).
 
-Not affiliated with Facepunch Studios.
+The API surface described here derives from the s&box engine's managed C# layer, published
+by Facepunch Studios at [Facepunch/sbox-public](https://github.com/Facepunch/sbox-public)
+under the MIT Licence. That copyright notice travels in `LICENSE`, as MIT requires.
+
+s&box is a trademark of Facepunch Studios Ltd. This project is not affiliated with, endorsed
+by, or sponsored by Facepunch Studios.

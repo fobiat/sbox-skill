@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : field-notes.md
+
+  The editor MCP server, and the ledger of behaviour confirmed in live sessions.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # Editor Tooling & Live-Verified Behaviour
 
 Everything here was either read out of the engine source at version **26.08.05**
@@ -14,7 +26,7 @@ hand, and before you assume a `[Sync]` value is replicating.
 ## The Editor MCP Server
 
 The s&box editor embeds an MCP server. It operates on **whatever project is currently
-open in the editor** — not on your working directory. Nothing you do through it applies
+open in the editor**, not on your working directory. Nothing you do through it applies
 to a project the editor hasn't loaded.
 
 ### Entry points
@@ -61,20 +73,20 @@ A project can register its own toolset from `Editor/` code with `[McpToolset]` +
 
 ### Two hard-won workflow facts
 
-Both are ledger rows, both cost a session to find.
+Both are ledger rows, and both cost a session to find, so save yourself the rediscovery.
 
 **1. Externally edited `.sbproj` / `.config` files are not watched.** (ledger
 A-07, live-verified 2026-08-07.) The engine reads the `.sbproj` at editor boot, or writes
-it from the in-editor Project Settings page. Nothing watches it for external edits. Edit
-`Metadata.Compiler` on disk and the compilers keep building with the stale config
-indefinitely — no warning, no rebuild. Recover with a `project_reload_config`-style tool
+it from the in-editor Project Settings page. Nothing watches it for external edits, so
+editing `Metadata.Compiler` on disk leaves the compilers building with the stale config
+indefinitely: no warning, no rebuild. Recover with a `project_reload_config`-style tool
 (`Project.LoadMinimal()` + `Project.UpdateCompiler()`, both engine-internal) or an editor
 restart.
 
 **2. After in-process compiler recreation, the source file watchers die.**
-(ledger A-08, live-verified 2026-08-07.) Pre-reload, writing a `.cs` file
+(ledger FN-4, live-verified 2026-08-07.) Pre-reload, writing a `.cs` file
 triggers a compile. Post-reload, new files and content edits to `Code/` and `Editor/`
-produced **no build for 15+ seconds** — `NeedsBuild` stayed false. Your edit is simply not
+produced **no build for 15+ seconds**: `NeedsBuild` stayed false. Your edit is simply not
 compiled, and `compile_status` truthfully reports the last successful build, so it looks
 like everything is fine.
 
@@ -89,20 +101,20 @@ like everything is fine.
 
 ### `[Sync(SyncFlags.FromHost)]` silently drops client writes
 
-Ledger **A-02**, live-verified 2026-08-07 (twice: Slice 0 on a host-owned object, Slice 2
+Ledger **FN-1**, live-verified 2026-08-07 (twice: Slice 0 on a host-owned object, Slice 2
 on a **client-owned** object where the writing client had `IsProxy == false`).
 
 Source chain:
 
-- `Scene/Networking/NetworkObject.DataTable.cs:75` — the control predicate for a synced
+- `Scene/Networking/NetworkObject.DataTable.cs:75`: the control predicate for a synced
   property is `c => isHostSync ? c.IsHost : HasControl( c )`. `FromHost` bypasses the
   ownership branch entirely: control means *host*, owner or not.
-- `Scene/Components/Component.Network.cs:64-68` — the generated setter checks
+- `Scene/Components/Component.Network.cs:64-68`: the generated setter checks
   `dataTable.HasControl( slot )` and, when it fails, `return`s **before**
   `p.Setter?.Invoke( p.Value )`. The backing field is never written.
 
 Observed: the client assigned `9999`; no exception, and the *immediate read-back* already
-showed the host's value. Not "reverted a frame later" — never applied at all.
+showed the host's value. Not "reverted a frame later", never applied at all.
 
 ```csharp
 // A client calling this sees no error and no effect. Debug by reading the value back.
@@ -123,25 +135,25 @@ private bool CanWriteChanges() => !Parent?.IsProxy ?? true;
 
 `Add`/`AddRange`/`Insert`/`Clear`/`RemoveAt`/`this[i] = v` all `return` early when it is
 false (`NetList.cs:144-249`); `Remove` returns `false`. **No exception, no log line.**
-`Parent` is the `NetworkTable.Entry`, whose `IsProxy` is `!HasControl( Connection.Local )`
-— so under `FromHost` a non-host mutation is a no-op, exactly like the scalar case.
+`Parent` is the `NetworkTable.Entry`, whose `IsProxy` is `!HasControl( Connection.Local )`,
+so under `FromHost` a non-host mutation is a no-op, exactly like the scalar case above.
 
-Ledger **A-04**, live-verified 2026-08-07: a `[Sync(SyncFlags.FromHost)] NetList<Entry>`
+Ledger **FN-2**, live-verified 2026-08-07: a `[Sync(SyncFlags.FromHost)] NetList<Entry>`
 where `Entry` is a struct of `Guid` + a `GameResource`-derived reference replicated three
 seeded rows to a second client with matching Guids, correctly resolved resource
 references, and a deliberately-null reference faithfully null, stable over 5 samples in
-15 s. See `networking.md` → *Networked Collections* for the authoring rules that fall out
+15 s. See `multiplayer.md` → *Networked Collections* for the authoring rules that fall out
 of this.
 
 ### `NetworkMode.Snapshot` does not live-replicate `[Sync]`
 
-Ledger **A-09**, live-verified 2026-08-07 — negatively, then positively.
+Ledger **FN-5**, live-verified 2026-08-07, first negatively, then positively.
 
 `GameObject.NetworkMode` defaults to `NetworkMode.Snapshot`
 (`Scene/GameObject/GameObject.Network.cs:62`), so **every object you place in a scene
 starts this way**. Snapshot means "included in the scene snapshot a joining client
-receives" — it does not create a `NetworkObject`, and `[Sync]` properties are only
-registered into a network table by `NetworkObject.RegisterPropertiesRecursive`
+receives", not "networked": it does not create a `NetworkObject`, and `[Sync]` properties
+are only registered into a network table by `NetworkObject.RegisterPropertiesRecursive`
 (`NetworkObject.DataTable.cs:29-55`). No `NetworkObject`, no live sync.
 
 RPCs keep working the whole time: instance RPC dispatch resolves the target through
@@ -163,34 +175,34 @@ at 117; RPCs routed correctly in both configurations. After the host called
 public bool NetworkSpawn() => NetworkSpawn( Connection.Local );
 ```
 
-On the host that is `Connection.Host`, which is usually what you wanted — but the
-parameterless form encodes *whoever happens to call it*, so the same line spawns a
-client-owned object the moment it runs from client code, and a host-owned one otherwise.
-For a world object nobody should control, and for a player object that must belong to a
-specific connection, always be explicit:
+On the host that resolves to `Connection.Host`, which is usually what you wanted. But the
+parameterless form encodes *whoever happens to call it*, not "the host" specifically, so
+the same line spawns a client-owned object the moment it runs from client code, and a
+host-owned one otherwise. For a world object nobody should control, and for a player
+object that must belong to a specific connection, always be explicit:
 
 ```csharp
 prop.NetworkSpawn( Connection.Host );        // world object, host-authoritative
 player.NetworkSpawn( connection );           // this connection's pawn
 ```
 
-Ledger **A-10**, live-verified 2026-08-07: a host-created object `NetworkSpawn(connection)`d
-is owned by that client — each client had `IsProxy == false` on its own player and
+Ledger **FN-6**, live-verified 2026-08-07: a host-created object `NetworkSpawn(connection)`d
+is owned by that client, each client had `IsProxy == false` on its own player and
 `IsProxy == true` on the other's. `NetworkSpawn( NetworkSpawnOptions )` at
 `GameObject.Network.cs:131-181` is the full form (`Owner`, `StartEnabled`, `OwnerTransfer`,
 `OrphanedMode`, `AlwaysTransmit`, `Flags`).
 
 ### `Rpc.FilterInclude` narrows sender-side, and binds the caller too
 
-Ledger **A-12**, live-verified 2026-08-07. `Rpc.FilterInclude` / `Rpc.FilterExclude` are
+Ledger **FN-7**, live-verified 2026-08-07. `Rpc.FilterInclude` / `Rpc.FilterExclude` are
 `static IDisposable` scopes over a connection, list or predicate
 (`Scene/Networking/Rpc.cs:187-283`, six overloads) that compose with a plain
 `[Rpc.Broadcast]`. The send loop skips non-recipients, so an excluded connection is
 **never sent the message** (`Systems/Networking/System/NetworkSystem.Send.cs:12-32`), and
 before running the body locally the RPC layer checks
 `Filter.IsRecipient( Connection.Local )` and skips it when excluded
-(`Rpc.InstanceRpc.cs:255` and `:289`, `Rpc.StaticRpc.cs:83`) — **the caller obeys its own
-filter**.
+(`Rpc.InstanceRpc.cs:255` and `:289`, `Rpc.StaticRpc.cs:83`): **the caller obeys its own
+filter, same as everyone else**.
 
 Observed at proximity-chat range: at distance 72, both connections received both
 directions; at distance 1003 the speaker's message reached only itself, and the host's
@@ -199,23 +211,24 @@ reverse message never appeared client-side; back at distance 0, delivery resumed
 ```csharp
 using ( Rpc.FilterInclude( c => InRange( c, origin, 256f ) ) )
 {
-    ReceiveSpeech( text );   // [Rpc.Broadcast] — reaches only the included set
+    ReceiveSpeech( text );   // [Rpc.Broadcast]: reaches only the included set
 }
 ```
 
-Do not add a second range check inside the RPC body "to be safe" — the filter already
-applied to the local run, and a redundant check will drop the speaker's own copy.
+Don't add a second range check inside the RPC body "to be safe". The filter already
+applied to the local run, and a redundant check will drop the speaker's own copy along with
+everyone else's.
 
 ---
 
 ## Authoring a GameResource Asset by Hand
 
-The full attribute/serialisation reference is in `api-schema-core.md` →
-*GameResource & `[AssetType]`*. This is the mechanical recipe, in order, for creating a
-custom resource asset from outside the editor.
+The full attribute/serialisation reference is in `api-core.md` →
+*GameResource & `[AssetType]`*. What follows is the mechanical recipe, in order, for
+creating a custom resource asset from outside the editor.
 
 **1. Define the type.** `[GameResource(...)]` is obsolete engine-wide
-(`Resources/GameResourceAttribute.cs:82`) — with `TreatWarningsAsErrors` it is a hard
+(`Resources/GameResourceAttribute.cs:82`); with `TreatWarningsAsErrors` it is a hard
 build failure, which is how it was found.
 
 ```csharp
@@ -250,18 +263,18 @@ editor fill it), `__version` the resource version. A `Model`/`Material`/`SoundEv
 **3. Compile it.** Source JSON is inert; the runtime only ever loads the compiled `_c`
 (`ResourceLibrary.cs:460-466` appends `_c` before reading). Either:
 
-- `create_asset` with `type: "item"` and the starting JSON — creates the source file and
-  compiles it; or
+- `create_asset` with `type: "item"` and the starting JSON, which creates the source file
+  and compiles it; or
 - write the file yourself and call `asset_compile`; or
 - `asset_write` to overwrite an existing asset's JSON and recompile in one step.
 
 `create_asset` fails if the file already exists (use `asset_write`), validates the JSON
-before touching disk, and reports `IsCompileFailed` — when it does, `read_console` says
+before touching disk, and reports `IsCompileFailed`; when it does, `read_console` says
 why.
 
 **4. Read it back at runtime** with `ResourceLibrary.Get<ItemDefinition>( "path/x.item" )`
 / `TryGet`, or enumerate with `ResourceLibrary.GetAll<ItemDefinition>()`. Persist a
-reference as `ResourcePath` (a string) — `Resource.ResourceId` is `[Obsolete]`
+reference as `ResourcePath` (a string): `Resource.ResourceId` is `[Obsolete]`
 (`Resources/Resource.cs:16-17`).
 
 > Do not hand-edit a compiled `_c` file, and do not expect an edited source file to take
@@ -275,12 +288,12 @@ reference as `ResourcePath` (a string) — `Resource.ResourceId` is `[Obsolete]`
 called from `OnUpdate` only inside `if ( !IsProxy )`
 (`PlayerController.DefaultControls.cs:41-49`), so the whole hover/press pipeline is local
 to the machine that owns the player. Anything authoritative inside `Press` must go through
-an `[Rpc.Host]`. See `core-concepts.md` → *IPressable* and
-`patterns-and-examples.md` → *Example 11*.
+an `[Rpc.Host]`. See `scene-and-components.md` → *IPressable* and
+`worked-examples.md` → *Example 11*.
 
 **Platform chat is a global side-channel independent of your UI.**
 `Sandbox.Platform.Chat.Say()` posts to the host whenever
 `ProjectSettings.Platform.ChatEnabled` is true, regardless of `ChatShowUI`
 (`Systems/Chat/Chat.cs:38-58`). Hiding the overlay does not disable the pipe. A gamemode
 with its own chat must set `ChatEnabled: false` in `ProjectSettings/Platform.config`. See
-`input-and-physics.md` → *Project Settings Configs*.
+`input-traces-and-physics.md` → *Project Settings Configs*.

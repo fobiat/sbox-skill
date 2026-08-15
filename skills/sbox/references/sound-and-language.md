@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : sound-and-language.md
+
+  The audio mixer graph and sound handles, plus phrases and language files.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # Audio & Localization
 
 Covers the `Sandbox.Audio` mixer graph (bus routing, occlusion/spatialization, processors,
@@ -212,7 +224,7 @@ Obsolete members still present for old code: `Decibels` (unused), `Reflections` 
 `Update()` (empty no-op, "no longer needs to exist").
 
 `GameObject.PlaySound(...)` / `GameObject.StopAllSounds(fadeOutTime)` are the positional
-convenience wrappers, covered in `components-builtin.md`. They ultimately call into the same
+convenience wrappers, covered in `component-library.md`. They ultimately call into the same
 `Sound.Play` / `SoundHandle.Stop` machinery described here.
 
 ### 5. Audio processors

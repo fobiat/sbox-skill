@@ -12,7 +12,7 @@ body:
     id: file
     attributes:
       label: Which reference file
-      placeholder: references/networking.md
+      placeholder: references/multiplayer.md
     validations:
       required: true
   - type: input

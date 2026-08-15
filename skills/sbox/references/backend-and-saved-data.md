@@ -1,3 +1,15 @@
+<!--
+  s&box Skill : backend-and-saved-data.md
+
+  Backend services and saved state: stats, leaderboards, save data, packages and mounting.
+
+  Author  : Kyle (fobiat) <kyle@fobiat.dev>
+  Links   : https://fobiat.dev/   https://github.com/fobiat
+  Engine  : s&box 26.08.05
+  Licence : MIT. Describes an API surface derived from Facepunch/sbox-public,
+            which is MIT licensed. See LICENSE at the repository root.
+-->
+
 # Services & Persistence
 
 Backend services (stats, leaderboards, achievements), save data, package querying/mounting,
