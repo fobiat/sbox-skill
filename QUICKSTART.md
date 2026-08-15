@@ -15,6 +15,12 @@ close the loop: write, verify, build, read the real error.
 You can run either alone. This walks through both. For the long version, every tool explained
 and the reasoning behind each, see the [in-depth guide](GUIDE.md).
 
+> **On the two words.** The package is called **s&box MCP Server**. Strictly it is a
+> *toolset*: s&box ships the MCP server inside the editor, on `127.0.0.1:7269`, and this
+> registers into it rather than starting anything. Both words appear below and they mean
+> different things: the **server** is the editor's, the **toolset** is what this adds to it.
+
+
 <br>
 
 ## 1. Get the files

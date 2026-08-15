@@ -30,6 +30,13 @@
 
 <br>
 
+> **On the two words.** The package is called **s&box MCP Server**. Strictly it is a
+> *toolset*: s&box ships the MCP server inside the editor, on `127.0.0.1:7269`, and this
+> registers into it rather than starting anything. Both words appear below and they mean
+> different things: the **server** is the editor's, the **toolset** is what this adds to it.
+
+<br>
+
 You write a component. It compiles. You press play. Nothing moves.
 
 There is no error. There is no warning. The console is clean. Somewhere between the code you

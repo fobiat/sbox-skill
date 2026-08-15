@@ -52,6 +52,12 @@ this: eighteen MCP tools that ask the running engine directly.
 
 Either half works alone. Together they close a loop, which section 5 covers.
 
+> **On the two words.** The package is called **s&box MCP Server**. Strictly it is a
+> *toolset*: s&box ships the MCP server inside the editor, on `127.0.0.1:7269`, and this
+> registers into it rather than starting anything. Both words appear below and they mean
+> different things: the **server** is the editor's, the **toolset** is what this adds to it.
+
+
 ---
 
 ## 2. Installing
@@ -154,8 +160,9 @@ To confirm the install worked, search rather than list:
 Eighteen is correct.
 
 One consequence worth knowing: the read-only hint never reaches your client's tool list either, so
-a client will treat every tool here as a destructive write and may prompt before each. Seven of
-the eighteen genuinely only ask questions.
+a client will treat every tool here as a destructive write and may prompt before each. Fourteen
+of the eighteen genuinely only ask questions; the four that change something are the reload,
+rebuild and build pair.
 
 ---
 
