@@ -5,9 +5,10 @@
 //  Links    : https://fobiat.dev/   https://github.com/fobiat
 //  Licence  : MIT, see LICENSE at the repository root.
 //
-//  Nine editor MCP tools that close the gap between editing s&box source on disk
-//  and getting the editor to notice. Drop this file into a project's Editor/
-//  folder and the tools appear under the "sbox_dev" toolset in list_toolsets.
+//  Eleven editor MCP tools in three groups: query the running engine for what an
+//  API really is, read what the editor currently believes, and make it notice a
+//  change on disk. Drop this file into a project's Editor/ folder and the tools
+//  appear under the "sbox_dev" toolset in list_toolsets.
 //
 //  The gap is real and costs whole sessions, because it has three separate
 //  causes and none of them produce an error:
@@ -45,7 +46,7 @@ namespace Editor.Mcp;
 /// <summary>
 /// Project, config and compiler tools for driving an s&amp;box project from outside the editor.
 /// </summary>
-[McpToolset( "sbox_dev", "Inspect and drive the open project: read project and compiler state, list compile errors and input actions, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
+[McpToolset( "sbox_dev", "Query the running engine for real type signatures and input actions, read project and compiler state including what each compiler has noticed, list compile errors, reload an externally edited .sbproj or ProjectSettings config, and rebuild from source on disk." )]
 public static class SboxDevTools
 {
 	const BindingFlags StaticInternal = BindingFlags.Static | BindingFlags.NonPublic;
