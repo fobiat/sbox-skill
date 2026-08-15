@@ -13,6 +13,7 @@
 #  check_skill.py is the per-commit gate. This is the pre-release one.
 # =============================================================================
 
+import json
 import pathlib
 import re
 import subprocess
@@ -21,6 +22,8 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 SKILL = ROOT / "skills" / "sbox"
 MCP = ROOT / "editor-mcp" / "SboxDevTools.cs"
+PLUGIN_DIR = ROOT / ".claude-plugin"
+LIBRARY = ROOT / "library"
 
 TOOLS = {
     "project_find_type", "project_type_members", "project_input_actions",
@@ -107,6 +110,33 @@ def main():
     gate = subprocess.run([sys.executable, str(ROOT / "scripts" / "check_skill.py")],
                           capture_output=True, text=True)
     check(gate.returncode == 0, "check_skill.py passes")
+
+    section("DISTRIBUTION")
+    market = json.loads((PLUGIN_DIR / "marketplace.json").read_text(encoding="utf-8"))
+    plugin = json.loads((PLUGIN_DIR / "plugin.json").read_text(encoding="utf-8"))
+    entries = market["plugins"]
+    check(len(entries) == 1, "one plugin entry", f"{len(entries)} found")
+
+    entry = entries[0]
+    check(entry["name"] == plugin["name"], "plugin name agrees", plugin["name"])
+    check(entry["version"] == plugin["version"], "plugin version agrees", plugin["version"])
+
+    # source is relative to the plugin root, so it has to reach the skills dir
+    check((PLUGIN_DIR.parent / entry["source"] / "skills" / "sbox" / "SKILL.md").is_file(),
+          "plugin source resolves to the skill")
+
+    latest = re.search(r"^## \[([0-9.]+)\]", (ROOT / "CHANGELOG.md").read_text(encoding="utf-8"),
+                       re.M)
+    check(latest is not None and latest.group(1) == plugin["version"],
+          "plugin version matches changelog", latest.group(1) if latest else "none")
+
+    sbproj = json.loads((LIBRARY / "sbox_dev.sbproj").read_text(encoding="utf-8"))
+    check(sbproj["Type"] == "library", "sbproj is a library", sbproj["Type"])
+    check(sbproj["Ident"] == "sbox_dev", "sbproj ident", sbproj["Ident"])
+
+    # the library ships a copy, and a drifted copy is a silently wrong package
+    check((LIBRARY / "Editor" / "SboxDevTools.cs").read_bytes() == MCP.read_bytes(),
+          "library copy identical to editor-mcp")
 
     print()
     if failures:

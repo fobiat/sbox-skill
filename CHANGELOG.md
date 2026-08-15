@@ -3,6 +3,33 @@
 All notable changes to this project are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-08-15
+
+Distribution only. **The skill and the toolset are unchanged**, byte for byte. This release is
+about how you get them.
+
+### Added
+- `.claude-plugin/`, making the repo its own plugin marketplace. Install with
+  `/plugin marketplace add fobiat/sbox-skill` then `/plugin install sbox@sbox-skill`, and
+  updates arrive with `/plugin update` rather than a fresh clone. The skill still carries its
+  own frontmatter and still works in any agent that can read a file, so this is one more route
+  in and not a dependency.
+- `library/`, packaging `sbox_dev` as an s&box library project so it can be published to
+  asset.party and pulled in as a package reference instead of a copied file. Three engine
+  behaviours make this work, all read from source at 26.08.05 and cited in
+  [`library/README.md`](library/README.md): the editor assembly compiles unsandboxed, a
+  consuming game or addon references every library that has an `Editor/` folder, and MCP tools
+  are discovered across all loaded editor assemblies. Whether asset.party's publish flow accepts
+  such a library is untested, and the file-drop install stays supported either way.
+- `scripts/sync_library.py`, because a library cannot reference a source file outside its own
+  project root, so `library/Editor/SboxDevTools.cs` has to be a copy.
+
+### Changed
+- `scripts/verify_release.py` gained a `DISTRIBUTION` section: the two manifests must agree on
+  name and version, the plugin source must resolve to the skill, the version must match the
+  changelog, and the library copy must be byte-identical to `editor-mcp/SboxDevTools.cs`. A
+  drifted copy is a package that is silently wrong rather than obviously broken.
+
 ## [0.1.2] - 2026-08-15
 
 Internal refactor of the toolset. **No behaviour change**: all 11 tool names, their read-only
