@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : shading-and-render-path.md
+  s&box Skill : 09_RENDERING.md
 
   Shader authoring and the render path: .shader files, materials, render attributes and layers.
 
@@ -528,7 +528,7 @@ matching `Graphics` call:
 ```csharp
 public CommandList( string debugName = null );
 public bool Enabled { get; set; }
-public HudPainter Paint { get; }                     // 2D drawing, see component-library.md HudPainter
+public HudPainter Paint { get; }                     // 2D drawing, see 02_COMPONENTS.md HudPainter
 
 public void Reset();                                  // clear all recorded entries
 public void Blit( Material material, RenderAttributes attributes = null );
@@ -720,7 +720,7 @@ drawn into. They're unrelated enums that happen to both mention "viewmodel".
 ### `CameraComponent.RenderTags` / `RenderExcludeTags`
 
 Ordinary tag-based include/exclude filtering on `CameraComponent` (documented in
-`component-library.md`): a camera only renders objects whose tags satisfy `RenderTags`/don't
+`02_COMPONENTS.md`): a camera only renders objects whose tags satisfy `RenderTags`/don't
 match `RenderExcludeTags`. This is the mechanism actually reachable from components and prefabs
 for view-specific rendering (e.g. a first-person-only camera that only renders objects tagged
 `viewmodel`), as distinct from the `SceneRenderLayer` enum above.
@@ -734,7 +734,7 @@ for view-specific rendering (e.g. a first-person-only camera that only renders o
   (`engine/Sandbox.Engine/Scene/Components/Camera/CameraComponent.cs`, obsoleted 09/06/2025 and
   02/10/2025). They still compile and won't error, they just do nothing. Use
   `CameraComponent.AddCommandList( CommandList, Stage, order )` instead (section 5). Any older
-  sample code (including this skill's own `component-library.md`, which still lists them) is
+  sample code (including this skill's own `02_COMPONENTS.md`, which still lists them) is
   describing dead API.
 - `StaticCombo`/`DynamicCombo`/`Feature`/`RenderState`/`Attribute` are shader-compiler syntax, not
   C preprocessor macros, don't reason about them via the no-op `#define`s in `system.fxc`.

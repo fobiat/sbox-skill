@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : vr-and-voice-chat.md
+  s&box Skill : 12_VR_VOICE.md
 
   VR rig, controllers and haptics, plus voice chat capture, transmission and playback.
 

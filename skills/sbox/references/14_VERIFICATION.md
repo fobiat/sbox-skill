@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : field-notes.md
+  s&box Skill : 14_VERIFICATION.md
 
   The editor MCP server, and the ledger of behaviour confirmed in live sessions.
 
@@ -156,7 +156,7 @@ Under ledger **FN-2** (2026-08-07): a `[Sync(SyncFlags.FromHost)] NetList<Entry>
 `Entry` combines a `Guid` with a `GameResource`-derived reference, replicated three
 seeded rows to a second client. The Guids matched, resource references resolved
 correctly, and a reference deliberately left null stayed null, holding steady across 5
-samples over 15 s. `multiplayer.md` → *Networked Collections* covers the authoring rules
+samples over 15 s. `04_NETWORKING.md` → *Networked Collections* covers the authoring rules
 this produces.
 
 ### `[Sync]` never goes live under `NetworkMode.Snapshot`
@@ -238,7 +238,7 @@ everyone else's.
 
 ## Hand-Authoring a GameResource Asset
 
-The full attribute/serialisation reference is in `api-core.md` →
+The full attribute/serialisation reference is in `15_API_CORE.md` →
 *GameResource & `[AssetType]`*. What follows is the mechanical recipe, in order, for
 creating a custom resource asset from outside the editor.
 
@@ -306,11 +306,11 @@ Store a reference as a `ResourcePath` string rather than an ID:
 (`PlayerController.DefaultControls.cs:41-49`), which keeps the entire hover/press
 pipeline local to the machine that owns that player. Anything inside `Press` that needs
 to be authoritative has to go through an `[Rpc.Host]` instead. See
-`scene-and-components.md` → *IPressable* and `worked-examples.md` → *Example 11*.
+`01_SCENE.md` → *IPressable* and `13_EXAMPLES.md` → *Example 11*.
 
 **Platform chat runs as its own side-channel, disconnected from whatever UI you build.**
 Whenever `ProjectSettings.Platform.ChatEnabled` is true, `Sandbox.Platform.Chat.Say()`
 posts to the host regardless of `ChatShowUI` (`Systems/Chat/Chat.cs:38-58`). Turning off
 the overlay does nothing to the underlying pipe. A gamemode shipping its own chat has to
 explicitly set `ChatEnabled: false` in `ProjectSettings/Platform.config`. See
-`input-traces-and-physics.md` → *Project Settings Configs*.
+`05_INPUT_PHYSICS.md` → *Project Settings Configs*.

@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : avatars-and-outfits.md
+  s&box Skill : 08_AVATARS.md
 
   The Citizen avatar: Clothing, ClothingContainer and dressing a SkinnedModelRenderer.
 
@@ -331,7 +331,7 @@ Whichever path builds the clothing GameObjects, remember they're plain, non-netw
 GameObjects created under the body. If you re-dress an already-`NetworkSpawn`ed object
 (changing clothes mid-game, not just at spawn), call `go.Network.Refresh()` on the body's
 GameObject afterwards, structural changes after spawn are not automatically networked (see
-`multiplayer.md`).
+`04_NETWORKING.md`).
 
 ---
 

@@ -109,7 +109,7 @@ your-game/
         └── sbox/
             ├── SKILL.md
             └── references/
-                ├── scene-and-components.md
+                ├── 01_SCENE.md
                 └── ...
 ```
 
@@ -194,9 +194,9 @@ which reference file holds the answer and sends the model there.
                            │
      ┌─────────────────────┼──────────────────────┐
      ▼                     ▼                      ▼
-razor-interfaces      multiplayer.md          api-core.md
-   panels, SCSS       ownership, [Sync]     full signatures
-   BuildHash          RPCs, lobbies         for common types
+    03_UI.md         04_NETWORKING.md        15_API_CORE.md
+  panels, SCSS       ownership, [Sync]       full signatures
+    BuildHash          RPCs, lobbies        for common types
 ```
 
 The shape is deliberate. A single flat document gets skimmed, and a skimmed API reference is
@@ -220,22 +220,22 @@ That third rule is what the field notes exist for.
 
 | File | What it covers |
 |---|---|
-| [`scene-and-components.md`](skills/sbox/references/scene-and-components.md) | Scene, GameObject, Component, lifecycle, prefabs, scene events, `IPressable` |
-| [`component-library.md`](skills/sbox/references/component-library.md) | Rendering, physics, `CharacterController`, `PlayerController`, `Prop`, inventory, camera, lighting, audio, navigation, effects |
-| [`razor-interfaces.md`](skills/sbox/references/razor-interfaces.md) | `.razor` panels, `PanelComponent`, `BuildHash`, SCSS, flexbox, transitions, built-in controls, world panels |
-| [`multiplayer.md`](skills/sbox/references/multiplayer.md) | Lobbies, connections, ownership, `[Sync]`, `NetList`, RPCs, network events, dedicated servers |
-| [`input-traces-and-physics.md`](skills/sbox/references/input-traces-and-physics.md) | Input actions, `Scene.Trace`, physics world, collision listeners, math types, time, gizmos |
-| [`editor-extensions.md`](skills/sbox/references/editor-extensions.md) | `EditorTool`, `[CustomEditor]`, docks, the Widget and Layout system, editor asset access |
-| [`backend-and-saved-data.md`](skills/sbox/references/backend-and-saved-data.md) | Stats, leaderboards, achievements, `FileSystem.Data`, cookies, `Package`, mounting |
-| [`avatars-and-outfits.md`](skills/sbox/references/avatars-and-outfits.md) | Citizen model paths, `Clothing`, `ClothingContainer`, `Dresser`, body and material groups |
-| [`shading-and-render-path.md`](skills/sbox/references/shading-and-render-path.md) | `.shader` anatomy, HLSL entry points, `Material`, `RenderAttributes`, `CommandList`, render layers |
-| [`sound-and-language.md`](skills/sbox/references/sound-and-language.md) | Mixer graph, `SoundHandle`, audio processors, `Phrase`, language files, `#` tokens |
-| [`node-graphs.md`](skills/sbox/references/node-graphs.md) | Exposing C# as graph nodes, graph-backed callbacks a designer can wire |
-| [`vr-and-voice-chat.md`](skills/sbox/references/vr-and-voice-chat.md) | VR rig, controllers, haptics, voice capture, transmission, playback |
-| [`worked-examples.md`](skills/sbox/references/worked-examples.md) | Eleven complete components, from an FPS controller to a press-E vendor |
-| [`field-notes.md`](skills/sbox/references/field-notes.md) | The editor MCP server, and behaviour confirmed in live sessions |
-| [`api-core.md`](skills/sbox/references/api-core.md) | Full signatures for the types a game touches most |
-| [`api-index.md`](skills/sbox/references/api-index.md) | Namespace-organised index of the wider API surface |
+| [`01_SCENE.md`](skills/sbox/references/01_SCENE.md) | Scene, GameObject, Component, lifecycle, prefabs, scene events, `IPressable` |
+| [`02_COMPONENTS.md`](skills/sbox/references/02_COMPONENTS.md) | Rendering, physics, `CharacterController`, `PlayerController`, `Prop`, inventory, camera, lighting, audio, navigation, effects |
+| [`03_UI.md`](skills/sbox/references/03_UI.md) | `.razor` panels, `PanelComponent`, `BuildHash`, SCSS, flexbox, transitions, built-in controls, world panels |
+| [`04_NETWORKING.md`](skills/sbox/references/04_NETWORKING.md) | Lobbies, connections, ownership, `[Sync]`, `NetList`, RPCs, network events, dedicated servers |
+| [`05_INPUT_PHYSICS.md`](skills/sbox/references/05_INPUT_PHYSICS.md) | Input actions, `Scene.Trace`, physics world, collision listeners, math types, time, gizmos |
+| [`06_EDITOR.md`](skills/sbox/references/06_EDITOR.md) | `EditorTool`, `[CustomEditor]`, docks, the Widget and Layout system, editor asset access |
+| [`07_SERVICES.md`](skills/sbox/references/07_SERVICES.md) | Stats, leaderboards, achievements, `FileSystem.Data`, cookies, `Package`, mounting |
+| [`08_AVATARS.md`](skills/sbox/references/08_AVATARS.md) | Citizen model paths, `Clothing`, `ClothingContainer`, `Dresser`, body and material groups |
+| [`09_RENDERING.md`](skills/sbox/references/09_RENDERING.md) | `.shader` anatomy, HLSL entry points, `Material`, `RenderAttributes`, `CommandList`, render layers |
+| [`10_AUDIO.md`](skills/sbox/references/10_AUDIO.md) | Mixer graph, `SoundHandle`, audio processors, `Phrase`, language files, `#` tokens |
+| [`11_ACTIONGRAPH.md`](skills/sbox/references/11_ACTIONGRAPH.md) | Exposing C# as graph nodes, graph-backed callbacks a designer can wire |
+| [`12_VR_VOICE.md`](skills/sbox/references/12_VR_VOICE.md) | VR rig, controllers, haptics, voice capture, transmission, playback |
+| [`13_EXAMPLES.md`](skills/sbox/references/13_EXAMPLES.md) | Eleven complete components, from an FPS controller to a press-E vendor |
+| [`14_VERIFICATION.md`](skills/sbox/references/14_VERIFICATION.md) | The editor MCP server, and behaviour confirmed in live sessions |
+| [`15_API_CORE.md`](skills/sbox/references/15_API_CORE.md) | Full signatures for the types a game touches most |
+| [`16_API_INDEX.md`](skills/sbox/references/16_API_INDEX.md) | Namespace-organised index of the wider API surface |
 
 ---
 

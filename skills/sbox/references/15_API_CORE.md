@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : api-core.md
+  s&box Skill : 15_API_CORE.md
 
   Full signatures for the types a game touches most.
 
@@ -672,7 +672,7 @@ index, or pulls the asset from disk if it hasn't seen it yet, which is exactly w
 element.
 
 > Editing a resource file from outside the editor has its own trap: nothing watches the
-> source for changes. See `field-notes.md` → *Authoring a GameResource
+> source for changes. See `14_VERIFICATION.md` → *Authoring a GameResource
 > Asset by Hand* for the details.
 
 ---

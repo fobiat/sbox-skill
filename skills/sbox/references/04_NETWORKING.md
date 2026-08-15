@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : multiplayer.md
+  s&box Skill : 04_NETWORKING.md
 
   The networking model: lobbies, ownership, [Sync] state, RPCs and network events.
 

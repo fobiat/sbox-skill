@@ -27,7 +27,7 @@ version. Cite the repo-relative path.
 what actually happened. Cite the date.
 
 They are not the same claim and the gap between them is where the expensive bugs live. When
-the two disagree, the ledger in [`references/field-notes.md`](skills/sbox/references/field-notes.md)
+the two disagree, the ledger in [`references/14_VERIFICATION.md`](skills/sbox/references/14_VERIFICATION.md)
 wins, and the disagreement is itself worth writing down, because it is exactly the kind of
 thing nobody can look up.
 

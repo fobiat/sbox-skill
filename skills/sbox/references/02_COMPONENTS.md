@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : component-library.md
+  s&box Skill : 02_COMPONENTS.md
 
   The built-in component library: rendering, physics, movement, camera, lighting, audio, navigation.
 
@@ -322,7 +322,7 @@ Useful methods:
 - `ScreenToWorld( Vector2 screen )` → `Vector3`: finds the point on the near plane for a screen coordinate
 - `GetFrustum()` → `Frustum`
 - `RenderToTexture( Texture target, ViewSetup config = null )` → `bool`
-- `AddCommandList( CommandList list, Stage stage, int order )`: injects render commands at a given pipeline stage. See `references/shading-and-render-path.md`.
+- `AddCommandList( CommandList list, Stage stage, int order )`: injects render commands at a given pipeline stage. See `references/09_RENDERING.md`.
 
 **The old render hooks are flat-out dead in 26.08.05.** `AddHookAfterOpaque( string debugName, int order, Action<SceneCamera> effect )`, `AddHookAfterTransparent`, `AddHookBeforeOverlay` and `AddHookAfterUI` all carry `[Obsolete]`, and their bodies just return `null`. The call still compiles, still hands back a null `IDisposable`, and renders precisely nothing. Reach for `AddCommandList` with a `Stage` instead.
 
@@ -591,7 +591,7 @@ Useful methods:
 
 **Custom input:** turn off `UseInputControls`, then set `WishVelocity` and `EyeAngles` yourself inside `OnFixedUpdate`.
 
-**Pressing, "press E to use":** implement `Component.IPressable` on whatever component should be pressable. The controller traces `ReachLength` outward from the eye with an expanding radius, then hunts for `GetComponentsInParent<IPressable>( includeSelf: true )` on whatever the trace connects with. All of it runs client-side, on the pressing player only (`OnUpdate`, wrapped in `if ( !IsProxy )`), so anything that needs to be authoritative, granting an item, opening a door for everyone else, needs its own `[Rpc.Host]` call to actually take effect. One trap worth flagging: setting `UseLookControls = false` silently disables pressing along with it. See `scene-and-components.md` → *IPressable* and `worked-examples.md` → *Example 11*.
+**Pressing, "press E to use":** implement `Component.IPressable` on whatever component should be pressable. The controller traces `ReachLength` outward from the eye with an expanding radius, then hunts for `GetComponentsInParent<IPressable>( includeSelf: true )` on whatever the trace connects with. All of it runs client-side, on the pressing player only (`OnUpdate`, wrapped in `if ( !IsProxy )`), so anything that needs to be authoritative, granting an item, opening a door for everyone else, needs its own `[Rpc.Host]` call to actually take effect. One trap worth flagging: setting `UseLookControls = false` silently disables pressing along with it. See `01_SCENE.md` → *IPressable* and `13_EXAMPLES.md` → *Example 11*.
 
 **Events:** implement `PlayerController.IEvents` on a sibling component:
 ```csharp

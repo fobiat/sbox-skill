@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : worked-examples.md
+  s&box Skill : 13_EXAMPLES.md
 
   Complete worked examples, from an FPS controller to a press-E vendor.
 
@@ -17,8 +17,8 @@ verified against it, not trimmed placeholder fragments. Treat these as the start
 skeleton for your own systems: grab the closest match, delete what doesn't apply, and
 build outward from something that already compiles.
 
-They lean on the topical references (`scene-and-components.md`, `component-library.md`,
-`multiplayer.md`, `input-traces-and-physics.md`, `razor-interfaces.md`) for the surrounding
+They lean on the topical references (`01_SCENE.md`, `02_COMPONENTS.md`,
+`04_NETWORKING.md`, `05_INPUT_PHYSICS.md`, `03_UI.md`) for the surrounding
 concepts, so read those first. Everything here is spelled out in full rather than
 abbreviated, on purpose, so adapting one doesn't require guessing at the missing half.
 
@@ -1274,6 +1274,6 @@ Catch yourself writing any of these, and stop.
 
 ***
 
-*See the topical references (`scene-and-components.md`, `component-library.md`, `multiplayer.md`,
-`input-traces-and-physics.md`, `razor-interfaces.md`) for exhaustive API details. This file is for
+*See the topical references (`01_SCENE.md`, `02_COMPONENTS.md`, `04_NETWORKING.md`,
+`05_INPUT_PHYSICS.md`, `03_UI.md`) for exhaustive API details. This file is for
 patterns and shape; those are for signatures and specifics.*

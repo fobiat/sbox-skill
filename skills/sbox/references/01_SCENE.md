@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : scene-and-components.md
+  s&box Skill : 01_SCENE.md
 
   Scene, GameObject and Component: the object model, lifecycle, prefabs and scene events.
 
@@ -371,7 +371,7 @@ Here's how the stock controller wires all of this together (`PlayerController.In
   `UpdateLookAt()` only runs inside that same branch, so switching off look controls drags
   pressing down with it.
 
-See `worked-examples.md` → *Example 11* for a complete worked version.
+See `13_EXAMPLES.md` → *Example 11* for a complete worked version.
 
 ***
 
@@ -643,7 +643,7 @@ Most Unity muscle memory carries straight over if that's your background, just u
 | `Application.isPlaying` | `Game.IsEditor` (inverted sense) |
 | `SceneManager.LoadScene()` | `Scene.Load()` or `Scene.LoadFromFile()` |
 | `DontDestroyOnLoad( go )` | `go.Flags = GameObjectFlags.DontDestroyOnLoad` |
-| `Physics.Raycast()` | `Scene.Trace.Ray()` (see input-traces-and-physics.md) |
+| `Physics.Raycast()` | `Scene.Trace.Ray()` (see 05_INPUT_PHYSICS.md) |
 | `OnCollisionEnter()` | Implement `Component.ICollisionListener` interface |
 | `OnTriggerEnter()` | Implement `Component.ITriggerListener` interface |
 

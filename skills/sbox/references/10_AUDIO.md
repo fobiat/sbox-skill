@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : sound-and-language.md
+  s&box Skill : 10_AUDIO.md
 
   The audio mixer graph and sound handles, plus phrases and language files.
 
@@ -224,7 +224,7 @@ Obsolete members still present for old code: `Decibels` (unused), `Reflections` 
 `Update()` (empty no-op, "no longer needs to exist").
 
 `GameObject.PlaySound(...)` / `GameObject.StopAllSounds(fadeOutTime)` are the positional
-convenience wrappers, covered in `component-library.md`. They ultimately call into the same
+convenience wrappers, covered in `02_COMPONENTS.md`. They ultimately call into the same
 `Sound.Play` / `SoundHandle.Stop` machinery described here.
 
 ### 5. Audio processors

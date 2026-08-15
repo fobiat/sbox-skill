@@ -25,7 +25,7 @@ s&box is a C# scripting layer on Source 2, built by Facepunch. It borrows the `G
 
 That surface similarity is the whole problem. Unity muscle memory produces code that looks right, reads right, and does not compile.
 
-**Open the relevant reference file before you write a single line.** This file is a router. It tells you where the answer is; it does not contain the answer. Writing a component? Open `references/scene-and-components.md`. Writing UI? Open `references/razor-interfaces.md`. There is no exception for a task that feels simple, because the tasks that feel simple are the ones muscle memory ruins.
+**Open the relevant reference file before you write a single line.** This file is a router. It tells you where the answer is; it does not contain the answer. Writing a component? Open `references/01_SCENE.md`. Writing UI? Open `references/03_UI.md`. There is no exception for a task that feels simple, because the tasks that feel simple are the ones muscle memory ruins.
 
 The API schema is ground truth. Where this file and the schema disagree, the schema wins.
 
@@ -42,7 +42,7 @@ Scene (is-a GameObject, the root)
 - **All gameplay code** is a `sealed class` extending `Sandbox.Component`.
 - **Lifecycle overrides** are `protected override void OnAwake() / OnStart() / OnUpdate() / OnFixedUpdate() / OnEnabled() / OnDisabled() / OnDestroy()`. They are virtual methods on `Component`, not magic methods matched by name, and they all start with `On`.
 - **Transforms live on the GameObject**, reachable from any Component as `WorldPosition`, `WorldRotation`, `LocalPosition`, `LocalRotation`. There is no `transform`.
-- **Game UI is Razor**: `.razor` files holding HTML, SCSS and C#, laid out with flexbox, hot-reloaded in the editor. **Editor UI is not Razor.** It is a separate Qt-backed `Widget` system, and confusing the two is a common and expensive mistake. See `references/editor-extensions.md`.
+- **Game UI is Razor**: `.razor` files holding HTML, SCSS and C#, laid out with flexbox, hot-reloaded in the editor. **Editor UI is not Razor.** It is a separate Qt-backed `Widget` system, and confusing the two is a common and expensive mistake. See `references/06_EDITOR.md`.
 - **Networking is owner-authoritative.** Mark state `[Sync]`, mark methods `[Rpc.Broadcast / Host / Owner]`, and skip simulation on non-owners with `if ( IsProxy ) return;`.
 - **Physics** is `Rigidbody` plus `Collider` components. Traces are a builder: `Scene.Trace.Ray( from, to ).Run()`. Collisions arrive through `Component.ICollisionListener` and `Component.ITriggerListener`.
 - **The coordinate system is Z-up.** `Vector3.Forward = (1,0,0)`, `Vector3.Right = (0,-1,0)`, `Vector3.Up = (0,0,1)`. Re-check every literal direction you write.
@@ -56,62 +56,62 @@ Match the task, open the file. Do not guess, open the file.
 
 | Task | Read |
 |---|---|
-| Understand the Scene, GameObject and Component model | `references/scene-and-components.md` |
-| Write a `Component` (lifecycle, `[Property]`, tags, async) | `references/scene-and-components.md` |
-| Spawn, clone or destroy a prefab | `references/scene-and-components.md`, *Prefabs* |
-| Fire a scene event (`ISceneEvent<T>`) | `references/scene-and-components.md`, *Scene Events* |
-| Write a `GameObjectSystem` | `references/scene-and-components.md`, *GameObjectSystem* |
-| Make something usable, walk up and press E (`IPressable`) | `references/scene-and-components.md`, *IPressable*, then `references/worked-examples.md` |
-| Declare a custom data asset (`GameResource` + `[AssetType]`) | `references/api-core.md`, *GameResource* |
-| Use `ModelRenderer`, `SkinnedModelRenderer`, bones, animgraph | `references/component-library.md`, *Rendering* |
-| Use `Rigidbody`, colliders, joints | `references/component-library.md`, *Physics* |
-| Move something with `CharacterController` | `references/component-library.md`, *CharacterController* |
-| Use the built-in `PlayerController` | `references/component-library.md`, *Gameplay* |
-| Use `Prop`, or compose renderer + collider + rigidbody yourself | `references/component-library.md`, *Prop* |
-| Use the built-in inventory components | `references/component-library.md`, *Inventory* |
-| Set up a camera, HUD painter or post-processing | `references/component-library.md`, *Camera* |
-| Use lights, fog, envmap probes, skybox | `references/component-library.md`, *Lighting* |
-| Use `NavMeshAgent`, `NavMeshLink`, query the NavMesh | `references/component-library.md`, *Navigation* |
-| Create particles, decals, trails, beams | `references/component-library.md`, *Effects* |
-| Write a Razor panel (`.razor`, `PanelComponent`, `BuildHash`) | `references/razor-interfaces.md` |
-| Style with SCSS, flexbox, `:intro` / `:outro`, `:bind` | `references/razor-interfaces.md`, *Styling* |
-| Use built-in controls (`Button`, `TextEntry`, `DropDown`, `VirtualList`) | `references/razor-interfaces.md`, *Built-in Controls* |
-| Build a world-space panel or a NavigationHost app | `references/razor-interfaces.md`, *WorldPanel* |
-| Set up a lobby, connect, disconnect, query `Connection` | `references/multiplayer.md`, *Lobby & Connection* |
-| Network an object (`NetworkMode`, `NetworkSpawn`, ownership) | `references/multiplayer.md`, *Networked Objects* |
-| Use `[Sync]`, `[Change]`, `NetList`, `NetDictionary` | `references/multiplayer.md`, *Sync Properties* |
-| Write RPCs (`[Rpc.Broadcast/Host/Owner]`, `NetFlags`, filtering) | `references/multiplayer.md`, *RPC Messages* |
-| React to connections (`INetworkListener`, `INetworkSpawn`) | `references/multiplayer.md`, *Network Events* |
-| Split host and client startup (`ISceneStartup`) | `references/multiplayer.md`, *Scene Startup* |
-| Run a dedicated server, `#if SERVER`, permissions | `references/multiplayer.md`, *Dedicated Servers* |
-| Poll keyboard, mouse, controller, haptics, glyphs | `references/input-traces-and-physics.md`, *Input* |
-| Trace a ray, sphere, box or capsule with tag filters | `references/input-traces-and-physics.md`, *SceneTrace* |
-| Reach `PhysicsWorld`, gravity, physics events | `references/input-traces-and-physics.md`, *Physics World* |
-| Implement collision and trigger listeners | `references/input-traces-and-physics.md`, *Collision System* |
-| Use `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox`, `Ray` | `references/input-traces-and-physics.md`, *Math Types* |
-| Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/input-traces-and-physics.md`, *Time* |
-| Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/input-traces-and-physics.md`, *Gizmo* |
-| Write an editor tool, custom inspector or dock | `references/editor-extensions.md` |
-| Build editor UI with `Widget` and `Layout` (not Razor) | `references/editor-extensions.md`, *Widget system* |
-| Record stats, read or submit leaderboards, unlock achievements | `references/backend-and-saved-data.md` |
-| Save and load player or game data | `references/backend-and-saved-data.md`, *Persistence* |
-| Query, mount or read a `Package` | `references/backend-and-saved-data.md`, *Package* |
-| Dress a player, use `Clothing` or `ClothingContainer` | `references/avatars-and-outfits.md` |
-| Find the Citizen model, body groups or material groups | `references/avatars-and-outfits.md` |
-| Write a `.shader`, or set material and render attributes | `references/shading-and-render-path.md` |
-| Work with render layers, custom render objects, `CommandList` | `references/shading-and-render-path.md` |
-| Route sound through the mixer graph, control a `SoundHandle` | `references/sound-and-language.md` |
-| Localize text, use `Phrase` or `#` tokens | `references/sound-and-language.md`, *Localization* |
-| Expose a C# method as a graph node, or a graph-backed callback | `references/node-graphs.md` |
-| Serialize, invoke or hotload an ActionGraph from code | `references/node-graphs.md`, *Serialization* |
-| Detect VR, read the rig, controllers or haptics | `references/vr-and-voice-chat.md` |
-| Capture, transmit or play voice chat, show a speaking indicator | `references/vr-and-voice-chat.md`, *Voice* |
-| Edit `Input.config` or `Platform.config`, kill the platform chat | `references/input-traces-and-physics.md`, *Project Settings Configs* |
-| Drive the editor over MCP (assets, scene, compile, play mode) | `references/field-notes.md`, *Editor MCP Server* |
-| Find out what has actually been proven in a live session | `references/field-notes.md`, *Verified Behaviour* |
-| Get the full signature of `GameObject`, `Component`, `Scene`, `Input` | `references/api-core.md` |
-| Check whether a type exists at all | `references/api-index.md` |
-| See a complete worked example before writing your own | `references/worked-examples.md` |
+| Understand the Scene, GameObject and Component model | `references/01_SCENE.md` |
+| Write a `Component` (lifecycle, `[Property]`, tags, async) | `references/01_SCENE.md` |
+| Spawn, clone or destroy a prefab | `references/01_SCENE.md`, *Prefabs* |
+| Fire a scene event (`ISceneEvent<T>`) | `references/01_SCENE.md`, *Scene Events* |
+| Write a `GameObjectSystem` | `references/01_SCENE.md`, *GameObjectSystem* |
+| Make something usable, walk up and press E (`IPressable`) | `references/01_SCENE.md`, *IPressable*, then `references/13_EXAMPLES.md` |
+| Declare a custom data asset (`GameResource` + `[AssetType]`) | `references/15_API_CORE.md`, *GameResource* |
+| Use `ModelRenderer`, `SkinnedModelRenderer`, bones, animgraph | `references/02_COMPONENTS.md`, *Rendering* |
+| Use `Rigidbody`, colliders, joints | `references/02_COMPONENTS.md`, *Physics* |
+| Move something with `CharacterController` | `references/02_COMPONENTS.md`, *CharacterController* |
+| Use the built-in `PlayerController` | `references/02_COMPONENTS.md`, *Gameplay* |
+| Use `Prop`, or compose renderer + collider + rigidbody yourself | `references/02_COMPONENTS.md`, *Prop* |
+| Use the built-in inventory components | `references/02_COMPONENTS.md`, *Inventory* |
+| Set up a camera, HUD painter or post-processing | `references/02_COMPONENTS.md`, *Camera* |
+| Use lights, fog, envmap probes, skybox | `references/02_COMPONENTS.md`, *Lighting* |
+| Use `NavMeshAgent`, `NavMeshLink`, query the NavMesh | `references/02_COMPONENTS.md`, *Navigation* |
+| Create particles, decals, trails, beams | `references/02_COMPONENTS.md`, *Effects* |
+| Write a Razor panel (`.razor`, `PanelComponent`, `BuildHash`) | `references/03_UI.md` |
+| Style with SCSS, flexbox, `:intro` / `:outro`, `:bind` | `references/03_UI.md`, *Styling* |
+| Use built-in controls (`Button`, `TextEntry`, `DropDown`, `VirtualList`) | `references/03_UI.md`, *Built-in Controls* |
+| Build a world-space panel or a NavigationHost app | `references/03_UI.md`, *WorldPanel* |
+| Set up a lobby, connect, disconnect, query `Connection` | `references/04_NETWORKING.md`, *Lobby & Connection* |
+| Network an object (`NetworkMode`, `NetworkSpawn`, ownership) | `references/04_NETWORKING.md`, *Networked Objects* |
+| Use `[Sync]`, `[Change]`, `NetList`, `NetDictionary` | `references/04_NETWORKING.md`, *Sync Properties* |
+| Write RPCs (`[Rpc.Broadcast/Host/Owner]`, `NetFlags`, filtering) | `references/04_NETWORKING.md`, *RPC Messages* |
+| React to connections (`INetworkListener`, `INetworkSpawn`) | `references/04_NETWORKING.md`, *Network Events* |
+| Split host and client startup (`ISceneStartup`) | `references/04_NETWORKING.md`, *Scene Startup* |
+| Run a dedicated server, `#if SERVER`, permissions | `references/04_NETWORKING.md`, *Dedicated Servers* |
+| Poll keyboard, mouse, controller, haptics, glyphs | `references/05_INPUT_PHYSICS.md`, *Input* |
+| Trace a ray, sphere, box or capsule with tag filters | `references/05_INPUT_PHYSICS.md`, *SceneTrace* |
+| Reach `PhysicsWorld`, gravity, physics events | `references/05_INPUT_PHYSICS.md`, *Physics World* |
+| Implement collision and trigger listeners | `references/05_INPUT_PHYSICS.md`, *Collision System* |
+| Use `Vector3`, `Rotation`, `Angles`, `Transform`, `BBox`, `Ray` | `references/05_INPUT_PHYSICS.md`, *Math Types* |
+| Use `Time.Now`, `Time.Delta`, `TimeSince`, `TimeUntil` | `references/05_INPUT_PHYSICS.md`, *Time* |
+| Draw debug gizmos (`DrawGizmos`, `Gizmo.Draw`) | `references/05_INPUT_PHYSICS.md`, *Gizmo* |
+| Write an editor tool, custom inspector or dock | `references/06_EDITOR.md` |
+| Build editor UI with `Widget` and `Layout` (not Razor) | `references/06_EDITOR.md`, *Widget system* |
+| Record stats, read or submit leaderboards, unlock achievements | `references/07_SERVICES.md` |
+| Save and load player or game data | `references/07_SERVICES.md`, *Persistence* |
+| Query, mount or read a `Package` | `references/07_SERVICES.md`, *Package* |
+| Dress a player, use `Clothing` or `ClothingContainer` | `references/08_AVATARS.md` |
+| Find the Citizen model, body groups or material groups | `references/08_AVATARS.md` |
+| Write a `.shader`, or set material and render attributes | `references/09_RENDERING.md` |
+| Work with render layers, custom render objects, `CommandList` | `references/09_RENDERING.md` |
+| Route sound through the mixer graph, control a `SoundHandle` | `references/10_AUDIO.md` |
+| Localize text, use `Phrase` or `#` tokens | `references/10_AUDIO.md`, *Localization* |
+| Expose a C# method as a graph node, or a graph-backed callback | `references/11_ACTIONGRAPH.md` |
+| Serialize, invoke or hotload an ActionGraph from code | `references/11_ACTIONGRAPH.md`, *Serialization* |
+| Detect VR, read the rig, controllers or haptics | `references/12_VR_VOICE.md` |
+| Capture, transmit or play voice chat, show a speaking indicator | `references/12_VR_VOICE.md`, *Voice* |
+| Edit `Input.config` or `Platform.config`, kill the platform chat | `references/05_INPUT_PHYSICS.md`, *Project Settings Configs* |
+| Drive the editor over MCP (assets, scene, compile, play mode) | `references/14_VERIFICATION.md`, *Editor MCP Server* |
+| Find out what has actually been proven in a live session | `references/14_VERIFICATION.md`, *Verified Behaviour* |
+| Get the full signature of `GameObject`, `Component`, `Scene`, `Input` | `references/15_API_CORE.md` |
+| Check whether a type exists at all | `references/16_API_INDEX.md` |
+| See a complete worked example before writing your own | `references/13_EXAMPLES.md` |
 
 ---
 
@@ -171,11 +171,11 @@ Any time you write the left column, you are hallucinating. Use the right.
 | `Application.isPlaying` | `Game.IsPlaying` |
 | `System.IO.File.ReadAllText(...)` | `FileSystem.Data.ReadAllText(...)` |
 | `UnityWebRequest` | `Http.RequestStringAsync(...)` / `Http.RequestJsonAsync<T>(...)` |
-| `PlayerPrefs` | `Game.Cookies`, see `references/backend-and-saved-data.md` |
-| `[MenuItem(...)]` editor script | `[EditorTool]` / `[CustomEditor]`, see `references/editor-extensions.md` |
+| `PlayerPrefs` | `Game.Cookies`, see `references/07_SERVICES.md` |
+| `[MenuItem(...)]` editor script | `[EditorTool]` / `[CustomEditor]`, see `references/06_EDITOR.md` |
 | `Update()` reads input and moves a rigidbody | Read input in `OnUpdate`, move in `OnFixedUpdate` |
 
-If a Unity pattern is not in this table, assume it does not exist and look it up in `references/api-core.md` before writing it.
+If a Unity pattern is not in this table, assume it does not exist and look it up in `references/15_API_CORE.md` before writing it.
 
 ---
 
@@ -190,7 +190,7 @@ If a Unity pattern is not in this table, assume it does not exist and look it up
 7. **Game UI is Razor and flexbox.** `display: flex` is the default and effectively the only layout; `display: block` does not exist. `:intro` and `:outro` animate creation and deletion. Root panels override `BuildHash()` to control re-render. Editor UI is a different system entirely.
 8. **There are no coroutines.** Use `async Task` with `await Task.DelaySeconds( n )` and `await Task.Frame()`. Fire and forget with `_ = MyTask();`. The `Component.Task` property scopes cancellation to the GameObject's lifetime.
 9. **Never touch blocked .NET APIs.** `System.IO.File`, `Console`, `Thread`, raw sockets and `HttpClient` are rejected by the sandbox compiler, not at runtime. Use `FileSystem.Data`, `Log`, `async/await` and `Http`.
-10. **Look up every API before you use it.** If you cannot find a method in `api-core.md` or `api-index.md`, either you are guessing, or it is nested on a specific type. Stop and check.
+10. **Look up every API before you use it.** If you cannot find a method in `15_API_CORE.md` or `16_API_INDEX.md`, either you are guessing, or it is nested on a specific type. Stop and check.
 
 ---
 
@@ -222,7 +222,7 @@ MyGame/
 - `.razor` and `.razor.scss` pair by filename, and the stylesheet loads itself when the panel is built.
 - Asset paths in code are forward-slash strings rooted at the project: `Model.Load( "models/dev/box.vmdl" )`.
 - There is no `Assets/` folder. Paths are flat under the project root.
-- `.cs` files hot-reload in the editor, but **do not rely on that when editing from outside the editor**. See `references/field-notes.md`.
+- `.cs` files hot-reload in the editor, but **do not rely on that when editing from outside the editor**. See `references/14_VERIFICATION.md`.
 - `ProjectSettings/*.config` and the `.sbproj` are read at boot and **not watched**. An external edit needs an explicit reload or an editor restart.
 
 ---
@@ -265,7 +265,7 @@ public sealed class MyComponent : Component
 }
 ```
 
-Complete runnable examples, including an FPS controller, a networked player, a Razor HUD, a hitscan weapon, a NavMeshAgent AI, a physics grenade, a prefab spawner, a trigger pickup and a press-E vendor, are in `references/worked-examples.md`.
+Complete runnable examples, including an FPS controller, a networked player, a Razor HUD, a hitscan weapon, a NavMeshAgent AI, a physics grenade, a prefab spawner, a trigger pickup and a press-E vendor, are in `references/13_EXAMPLES.md`.
 
 ---
 
@@ -299,11 +299,11 @@ Each of these is documented properly in a reference file. They are here because 
 ## When you are not sure an API exists
 
 1. **Check the topical file** for that area first. Topical files carry inline signatures for what they cover.
-2. **Then `api-core.md`**, which has full signatures for the most-used types.
-3. **Then `api-index.md`**, a namespace-organised index of the wider surface. Find the type, then get its full signature elsewhere.
+2. **Then `15_API_CORE.md`**, which has full signatures for the most-used types.
+3. **Then `16_API_INDEX.md`**, a namespace-organised index of the wider surface. Find the type, then get its full signature elsewhere.
 4. **If it is in none of them, it does not exist.** Do not write it. There is almost always an idiomatic way to do what you wanted.
 
-A schema entry proves an API exists. It does not prove it behaves the way you assume, and nearly every trap above is a case where a correct-looking call silently does nothing. `references/field-notes.md` records which behaviours were observed in a live editor session, with dates, as opposed to merely read out of source. Check it before concluding that the API says something should work.
+A schema entry proves an API exists. It does not prove it behaves the way you assume, and nearly every trap above is a case where a correct-looking call silently does nothing. `references/14_VERIFICATION.md` records which behaviours were observed in a live editor session, with dates, as opposed to merely read out of source. Check it before concluding that the API says something should work.
 
 ---
 

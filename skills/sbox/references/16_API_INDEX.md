@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : api-index.md
+  s&box Skill : 16_API_INDEX.md
 
   Namespace-organised index of the wider API surface.
 
@@ -13,9 +13,9 @@
 # API Schema: Extended Reference
 
 A namespace-organized index of public s\&box types, extracted from the engine's managed API surface at version 26.08.05. It covers everything not already listed in one of these:
-- `api-core.md`: full signatures for the ~50 most-used classes
-- `component-library.md`: all 144 built-in Component-derived types
-- `razor-interfaces.md`, `multiplayer.md`, `input-traces-and-physics.md`: these three include their API inline rather than deferring here
+- `15_API_CORE.md`: full signatures for the ~50 most-used classes
+- `02_COMPONENTS.md`: all 144 built-in Component-derived types
+- `03_UI.md`, `04_NETWORKING.md`, `05_INPUT_PHYSICS.md`: these three include their API inline rather than deferring here
 
 Use this file for discovery: to answer "does this exist?" and "what does it do?". Each entry follows the format `MethodName( args ) → ReturnType` or `PropertyName : Type`.
 
@@ -98,7 +98,7 @@ Marks a `GameResource` subclass as storable on disk as an asset. **This is what 
 not the obsolete `[GameResource(...)]`.** Configure it with property initializers rather
 than constructor arguments: `[AssetType( Name = "Item", Extension = "item", Category = "Game" )]`
 - `Name : string`, `Extension : string`, `Category : string` (default `"Other"`), `Flags : AssetTypeFlags`, `IconColor : string`, `static FindTypeByExtension( string extension ) → TypeDescription`
-- Full usage, on-disk JSON format and loading: `api-core.md` → *GameResource & `[AssetType]`*
+- Full usage, on-disk JSON format and loading: `15_API_CORE.md` → *GameResource & `[AssetType]`*
 
 ### AssetTypeFlags (enum)
 Flags for `AssetTypeAttribute`
@@ -298,7 +298,7 @@ Values: None, A, B, X, Y, SwitchLeftMenu, Guide, SwitchRightMenu, LeftJoystickBu
 
 ### GameResource (class)
 The base for assets defined in C# and created through tools: derive from it and tag the
-class with `[AssetType]`. See `api-core.md` → *GameResource & `[AssetType]`*
+class with `[AssetType]`. See `15_API_CORE.md` → *GameResource & `[AssetType]`*
 - `HasUnsavedChanges : bool`, `ResourceVersion : int`, `IsValid : bool`, `StateHasChanged(  ) → void`, `GetReferencedPackages(  ) → IEnumerable<string>`
 - From `Resource`: `ResourcePath : string` (persist this), `ResourceName : string`, `ResourceId : int` (**obsolete**)
 
@@ -586,7 +586,7 @@ A list built to network over `SyncAttribute` and `HostSyncAttribute`: it ships d
 across the wire, not the whole collection each time
 - `Clear(  ) → void`, `RemoveAt( int index ) → void`, `Dispose(  ) → void`, `Contains( T item ) → bool`, `Count : int`
 - `OnChanged : Action<NetListChangeEvent<T>>` looks like an event but is a **public field**; subscribe with `+=`. `[Change]` won't fire on a `NetList` property either, since it wraps the setter and only reacts to reassignment
-- A non-controller's mutations are silent no-ops. Set it once with `= new()` and don't reassign it after spawn. See `multiplayer.md` → *Networked Collections*
+- A non-controller's mutations are silent no-ops. Set it once with `= new()` and don't reassign it after spawn. See `04_NETWORKING.md` → *Networked Collections*
 
 ### NetListChangeEvent<T> (struct)
 Describes a change to a `NetListChangeEvent`1` which is passed to `OnChanged` whenever its contents change
@@ -1453,7 +1453,7 @@ The "walk up and press E" interface, for anything a player can press. It's neste
 - `Press( Component.IPressable.Event e ) → bool` (**the only required member**), `CanPress( e ) → bool`, `Pressing( e ) → bool`, `Release( e ) → void`, `Hover( e ) → void`, `Look( e ) → void`, `Blur( e ) → void`, `GetTooltip( e ) → Component.IPressable.Tooltip?`
 - `Event` : `record struct ( Component Source, Ray? Ray = default )`, where `Source` is the pressing `PlayerController`
 - `Tooltip` : `record struct ( string Title, string Icon, string Description, bool Enabled = true, IPressable Pressable = default )`
-- **`Press` fires on the pressing client, never the host.** See `scene-and-components.md` → *IPressable*
+- **`Press` fires on the pressing client, never the host.** See `01_SCENE.md` → *IPressable*
 
 ### ISceneEditorSession (interface)
 - `Scene : Scene`, `HasUnsavedChanges : bool`, `Selection : SelectionSystem`, `AddSelectionUndo(  ) → void`, `GetSelection(  ) → IEnumerable<object>`

@@ -1,5 +1,5 @@
 <!--
-  s&box Skill : input-traces-and-physics.md
+  s&box Skill : 05_INPUT_PHYSICS.md
 
   Input actions, Scene.Trace, the physics world, math types, time and gizmos.
 
@@ -98,7 +98,7 @@ from `Systems/Input/Input.Common.cs:14-58`):
 
 > **These files have no file watcher.** Edit a `.config` (or `.sbproj`) from outside the
 > editor and the running instance never notices; reload or restart it to pick the change
-> up. See the *Two hard-won workflow facts* section of `field-notes.md`.
+> up. See the *Two hard-won workflow facts* section of `14_VERIFICATION.md`.
 
 ### Platform Chat: a global side-channel you can't see
 
@@ -372,7 +372,7 @@ Scene.Trace.Ray( start, end ).WithCollisionRules( "bullet" ).Run();
 
 ### Listening for Collisions and Triggers
 
-`scene-and-components.md` covers `ICollisionListener` and `ITriggerListener` in full; here's the
+`01_SCENE.md` covers `ICollisionListener` and `ITriggerListener` in full; here's the
 short version:
 
 ```csharp
