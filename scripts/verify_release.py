@@ -70,7 +70,7 @@ def main():
 
     section("SKILL")
     refs = sorted((SKILL / "references").glob("*.md"))
-    check(len(refs) == 16, "16 reference files", f"{len(refs)} found")
+    check(len(refs) == 17, "17 reference files", f"{len(refs)} found")
 
     router = (SKILL / "SKILL.md").read_text(encoding="utf-8")
     check(router.startswith("---\n"), "frontmatter first")
